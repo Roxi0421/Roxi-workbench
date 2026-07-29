@@ -47,6 +47,22 @@ function setReadDone(k,done){
   else { log=log.filter(function(e){return e.key!==k;}); }
   lsSetJSON("wb_read_log",log);
 }
+/* 把日志键 "书名#章节号" 解析成可读的「《书名》第n章《章节标题》」 */
+function resolveReadKey(key){
+  if(!key || key.indexOf("#")<0) return null;
+  var idx = key.lastIndexOf("#");
+  var title = key.substring(0, idx);
+  var n = parseInt(key.substring(idx+1), 10);
+  var books = (CFG.reading && CFG.reading.books) || [];
+  for(var i=0;i<books.length;i++){
+    if(books[i].title===title){
+      var chs = books[i].chapters||[];
+      for(var j=0;j<chs.length;j++){ if(chs[j].n===n){ return {book:title, chapter:"第 "+n+" 章《"+esc(chs[j].title)+"》"}; } }
+      return {book:title, chapter:"第 "+n+" 章"};
+    }
+  }
+  return {book:title, chapter:"第 "+n+" 章"};
+}
 
 /* 便签 */
 function noteKey(d){return "wb_note_"+todayKey(d);}
@@ -345,7 +361,13 @@ function buildReading(d){
     var gi = keyOf(j);
     if(!done.has(gi)) todayChapters.push({book:flat[j].book, ch:flat[j].ch, gi:gi});
   }
-  return {dayOfWindow:dayOfWindow, daysInWindow:READING_WIN, books:books, todayChapters:todayChapters, done:done.size, total:total, isLast:dayOfWindow>=READING_WIN};
+  // 后续阅读计划：今日批次之后的前瞻章节（路线图，最多展示 LOOK 章）
+  var LOOK = 10;
+  var future = [];
+  for(var f=start+todayChapters.length; f<total && future.length<LOOK; f++){
+    future.push({book:flat[f].book, ch:flat[f].ch, gi:keyOf(f)});
+  }
+  return {dayOfWindow:dayOfWindow, daysInWindow:READING_WIN, books:books, todayChapters:todayChapters, future:future, done:done.size, total:total, isLast:dayOfWindow>=READING_WIN};
 }
 
 function renderReading(){
@@ -367,6 +389,19 @@ function renderReading(){
     });
   }
   var pct = rd.total?Math.round(rd.done/rd.total*100):0;
+  // 后续阅读计划（前瞻路线图），勾选后随进度实时推进
+  var futureHtml = "";
+  if(rd.future && rd.future.length){
+    futureHtml =
+      '<div class="sub-block-hd" style="margin-top:14px;">📌 后续阅读计划（前瞻 '+rd.future.length+' 章）</div>'+
+      '<div class="road-list">'+
+      rd.future.map(function(it){
+        return '<div class="road-item"><span class="road-bk">《'+esc(it.book.title)+'》</span> 第 '+it.ch.n+' 章 · '+esc(it.ch.title)+'</div>';
+      }).join("")+
+      '</div>';
+  } else {
+    futureHtml = '<div class="sub-block-hd" style="margin-top:14px;">📌 后续阅读计划</div><div class="rest">全部章节已排入计划，按计划推进即可 🌟</div>';
+  }
   wrap.innerHTML =
     '<h2 class="panel-title">📖 读书记录</h2>'+
     '<div class="panel-sub">本月书单 · 未读完次日顺延 · '+CFG.reminders.reading+' 提醒 <button type="button" class="btn-ghost" id="rdRemindBtn">开启桌面提醒</button></div>'+
@@ -374,20 +409,16 @@ function renderReading(){
     '<div class="quote-card" style="margin-bottom:12px;">📖 阅读第 <b>'+rd.dayOfWindow+'</b> / '+rd.daysInWindow+' 天</div>'+
     '<div class="quote-card plan-section" style="margin-bottom:12px;">📊 最近7天小计：阅读 <b>'+sum7read()+'</b> 章</div>'+
     chapters+
+    futureHtml+
     '<div class="goal"><div class="bar"><div class="bar-fill" style="width:'+pct+'%"></div></div>'+
     '<div class="goal-sub">已完成 '+rd.done+' / '+rd.total+' 章 · '+pct+'%</div></div>';
   // 绑定章节勾选 + 提醒按钮
   document.querySelectorAll('#m-reading input[data-read]').forEach(function(cb){
     cb.onchange = function(){
       var gi = cb.getAttribute('data-read');
-      setReadDone(gi, cb.checked);
-      var total = parseInt(cb.getAttribute('data-total')||'0', 10);
-      var done = getReadDone().size;
-      var pct = total?Math.round(done/total*100):0;
-      var wr = document.getElementById('m-reading');
-      var bf = wr.querySelector('.bar-fill'); if(bf) bf.style.width = pct+'%';
-      var gs = wr.querySelector('.goal-sub'); if(gs) gs.textContent = '已完成 '+done+' / '+total+' 章 · '+pct+'%';
-      var ch = cb.closest('.chapter'); if(ch) ch.classList.toggle('done', cb.checked);
+      setReadDone(gi, cb.checked);   // 写入完成集合 + 阅读日志（按天计入历史）
+      renderReading();              // 刷新：今日列表 + 进度 + 后续阅读计划（实时推进）
+      renderHistory();              // 同步历史记录面板
     };
   });
   var rb = document.getElementById('rdRemindBtn'); if(rb) rb.onclick = requestRemindPerm;
@@ -849,9 +880,9 @@ function bindTree(){
 }/* ============ 历史记录（阅读/观影/运动 按天汇总） ============ */
 function buildHistory(){
   var dates = {};
-  function slot(d){ if(!dates[d]) dates[d]={read:0, movies:[], exercise:null}; return dates[d]; }
+  function slot(d){ if(!dates[d]) dates[d]={read:0, readItems:[], movies:[], exercise:null}; return dates[d]; }
   // 阅读：按天勾选日志
-  getReadLog().forEach(function(e){ if(e && e.date) slot(e.date).read++; });
+  getReadLog().forEach(function(e){ if(e && e.date){ slot(e.date).read++; slot(e.date).readItems.push(e.key); } });
   // 观影：已看影片的添加日期
   getMoviesWatched().forEach(function(m){ if(m && m.date) slot(m.date).movies.push(m); });
   // 运动：逐日打卡记录
@@ -879,7 +910,10 @@ function renderHistory(){
     list.forEach(function(it){
       var d=it.date, dt=it.data;
       var lines=[];
-      if(dt.read>0) lines.push('📖 阅读 '+dt.read+' 章');
+      if(dt.read>0){
+        var rdet = (dt.readItems||[]).map(resolveReadKey).filter(Boolean).map(function(r){return '《'+esc(r.book)+'》'+r.chapter;}).join('、');
+        lines.push('📖 阅读 '+dt.read+' 章'+(rdet?('：'+rdet):''));
+      }
       if(dt.movies.length>0) lines.push('🎬 观影 '+dt.movies.length+' 部：'+dt.movies.map(function(m){return m.title;}).join('、'));
       if(dt.exercise) lines.push('🧘 运动 '+(dt.exercise.done?'✓':'')+(dt.exercise.note?(' · '+dt.exercise.note):''));
       html+='<div class="li"><div class="li-body"><div style="font-weight:700;color:var(--ink);">'+d+'</div>'+

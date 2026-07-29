@@ -389,9 +389,18 @@ body {
   margin-bottom: 8px;
 }
 
+/* 后续阅读计划（前瞻路线图） */
+.road-list { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 4px; }
+.road-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 12px;
+  background: var(--brand-soft); color: var(--muted);
+  font-size: 13px; border: 1px solid var(--line);
+}
+.road-bk { color: var(--brand); font-weight: 600; white-space: nowrap; }
+
 /* 金句 */
-.quote-card {
-  background: linear-gradient(135deg, #f7f0ff, #efe4ff);
+.quote-card {  background: linear-gradient(135deg, #f7f0ff, #efe4ff);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 12px 14px;
