@@ -410,6 +410,21 @@ body.nav-dragging .nav-item { cursor: grabbing; }
 }
 .road-bk { color: var(--brand); font-weight: 600; white-space: nowrap; }
 
+/* 昨日记录（0点翻页后保留并展示前一天数据） */
+.yest-box {
+  display: flex; flex-direction: column; gap: 6px; margin: 2px 0 4px;
+  padding: 10px 12px; border-radius: 14px;
+  background: var(--bg-soft, #f3f0fb);
+  border: 1px dashed var(--line);
+}
+.yest-item {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 12.5px; color: var(--muted); line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+}
+.yest-item .yest-ck { flex: 0 0 auto; filter: grayscale(0.2); }
+.yest-more { color: var(--brand); font-size: 12px; cursor: default; }
+
 /* 金句 */
 .quote-card {  background: linear-gradient(135deg, #f7f0ff, #efe4ff);
   border: 1px solid var(--line);

@@ -7,6 +7,7 @@ var CT = window.WB_CONTENT || {};
 /* ============ 通用工具 ============ */
 function pad(n){return n<10?"0"+n:""+n;}
 function todayKey(d){d=d||new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
+function yesterdayDate(d){d=d||new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate()-1);}
 function parseTime(s){var p=s.split(":");return parseInt(p[0],10)*60+parseInt(p[1]||"0",10);}
 function fmtTime(m){m=((m%1440)+1440)%1440;return pad(Math.floor(m/60))+":"+pad(m%60);}
 function seedFromDate(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
@@ -213,6 +214,17 @@ function renderPlan(){
   var wrap=document.getElementById("m-plan");
   var wd=isWorkday(d);
   var countdownHtml=wd?'<div id="countdown" class="countdown"></div>':"";
+  // 昨日记录：0点翻页后保留前一天的待办与运动打卡，仅在确有数据时展示
+  var yd=yesterdayDate(d), ykey=todayKey(yd);
+  var yTasks=getWorkTasks(yd), yEx=getExerciseLog(yd);
+  var yBlocks=[];
+  if(yEx&&(yEx.done||(yEx.note&&yEx.note.trim()))) yBlocks.push('<div class="yest-item">🏃 运动打卡：'+(yEx.done?'已完成 ✓':'未打卡')+(yEx.note?(' · '+esc(yEx.note)):'')+'</div>');
+  if(yTasks.length){
+    var yDone=yTasks.filter(function(t){return t.done;}).length;
+    var yList=yTasks.map(function(t){return '<div class="yest-item"><span class="yest-ck">'+(t.done?'✅':'⬜')+'</span> '+esc(t.text)+'</div>';}).join("");
+    yBlocks.push('<div class="yest-item">📋 昨日待办（'+yDone+' / '+yTasks.length+' 完成）</div>'+yList);
+  }
+  var yestHtmlPlan=yBlocks.length?'<div class="sub-block-hd" style="margin-top:16px;">📅 昨日记录（'+ykey+'）</div><div class="yest-box">'+yBlocks.join("")+'</div>':'';
   wrap.innerHTML=
     '<h2 class="panel-title">📅 每日计划</h2>'+
     '<div class="panel-sub">今日金句 · 运动打卡 · 待办 & 已完成</div>'+
@@ -225,7 +237,8 @@ function renderPlan(){
     '<div class="wt-add"><input id="wtInput" type="text" placeholder="输入今日任务，回车添加" maxlength="80">'+
     '<button type="button" id="wtAdd" class="btn-primary">添加</button></div>'+
     '<div id="wtPending"></div></div>'+
-    '<div class="plan-section"><div class="sub-block-hd">✅ 今日已完成</div><div id="wtDone"></div></div>';
+    '<div class="plan-section"><div class="sub-block-hd">✅ 今日已完成</div><div id="wtDone"></div></div>'+
+    yestHtmlPlan;
   // 渲染待办/已完成
   var pendEl=document.getElementById("wtPending");
   if(b.pends.length===0){pendEl.innerHTML='<div class="empty-tip">还没有待办任务</div>';}
@@ -287,13 +300,19 @@ function renderMood(){
     var m=ml.find(function(x){return x.id===h.data.mood;})||{};
     return '<label class="note-item" data-mhk="'+h.date+'"><input type="checkbox" data-mhdone="'+h.date+'" '+(h.data.reviewed?'checked':'')+'> '+(m.emo||"🙂")+' · '+h.date+' · '+(h.data.text||"(无文字)")+'</label>';
   }).join(""):'<div class="empty-tip">还没有心情记录</div>';
+  // 昨日记录：展示前一天的心情（仅确有数据时）
+  var yd=yesterdayDate(d), yMood=getMood(yd), yestHtmlMood="";
+  if(yMood&&(yMood.mood||(yMood.text&&yMood.text.trim()))){
+    var ym=ml.find(function(x){return x.id===yMood.mood;})||{};
+    yestHtmlMood='<div class="sub-block-hd" style="margin-top:16px;">📅 昨日心情（'+todayKey(yd)+'）</div><div class="yest-box"><div class="yest-item">'+(ym.emo||"🙂")+' '+(ym.label||"")+(yMood.text?(' · '+esc(yMood.text)):'')+'</div></div>';
+  }
   document.getElementById("m-mood").innerHTML=
     '<h2 class="panel-title">💗 心情记录</h2>'+
     '<div class="panel-sub">你今天感觉怎么样?</div>'+
     '<div class="mood-grid">'+cards+'</div>'+
     '<div class="quote-card plan-section"><b>📓 心情日记</b><br><textarea id="moodText" placeholder="今天还没有记录心情哦~" style="width:100%;margin-top:8px;min-height:70px;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:13px;">'+esc(today.text||"")+'</textarea>'+
     '<div style="text-align:right;margin-top:6px;"><button class="btn-primary" id="moodSave">保存今日心情</button></div></div>'+
-    historyHtml;
+    historyHtml+yestHtmlMood;
   bindMood();
 }
 
@@ -403,6 +422,14 @@ function renderReading(){
   } else {
     futureHtml = '<div class="sub-block-hd" style="margin-top:14px;">📌 后续阅读计划</div><div class="rest">全部章节已排入计划，按计划推进即可 🌟</div>';
   }
+  // 昨日阅读：按阅读日志里日期=昨天的条目统计（仅确有数据时展示）
+  var yd2=yesterdayDate(d), ykey2=todayKey(yd2);
+  var yReads=getReadLog().filter(function(e){return e.date===ykey2;});
+  var yestHtmlRead="";
+  if(yReads.length){
+    var ydet=yReads.map(function(e){var r=resolveReadKey(e.key);return r?('《'+esc(r.book)+'》'+r.chapter):"";}).filter(Boolean);
+    yestHtmlRead='<div class="sub-block-hd" style="margin-top:16px;">📅 昨日阅读（'+ykey2+'）</div><div class="yest-box"><div class="yest-item">📖 阅读 '+yReads.length+' 章'+(ydet.length?('：'+ydet.join('、')):'')+'</div></div>';
+  }
   wrap.innerHTML =
     '<h2 class="panel-title">📖 读书记录</h2>'+
     '<div class="panel-sub">本月书单 · 未读完次日顺延 · '+CFG.reminders.reading+' 提醒 <button type="button" class="btn-ghost" id="rdRemindBtn">开启桌面提醒</button></div>'+
@@ -412,7 +439,8 @@ function renderReading(){
     chapters+
     futureHtml+
     '<div class="goal"><div class="bar"><div class="bar-fill" style="width:'+pct+'%"></div></div>'+
-    '<div class="goal-sub">已完成 '+rd.done+' / '+rd.total+' 章 · '+pct+'%</div></div>';
+    '<div class="goal-sub">已完成 '+rd.done+' / '+rd.total+' 章 · '+pct+'%</div></div>'+
+    yestHtmlRead;
   // 绑定章节勾选 + 提醒按钮
   document.querySelectorAll('#m-reading input[data-read]').forEach(function(cb){
     cb.onchange = function(){
@@ -442,6 +470,7 @@ function movieTypeIcon(id){
 }
 
 function renderMovies(){
+  var d = new Date();
   var b = buildMovies();
   var wrap = document.getElementById("m-movie");
   var cats = (CFG.movieTypes||[]).map(function(t){return '<button class="tab'+(movieFilter===t.id?' active':'')+'" data-mf="'+t.id+'">'+t.icon+' '+t.label+'</button>';}).join("");
@@ -463,6 +492,9 @@ function renderMovies(){
       '<div class="li-actions"><button class="btn-edit" data-mwok="'+m.id+'">已看</button><button class="btn-del" data-mwdd="'+m.id+'">删</button></div></div>';
   }).join("") : '<div class="empty-tip">暂无片单备选</div>';
   var types = (CFG.movieTypes||[]).map(function(t){return '<option value="'+t.id+'">'+t.icon+' '+t.label+'</option>';}).join("");
+  // 昨日记录：展示前一天已观看的影片（仅确有数据时）
+  var ydm=yesterdayDate(d), yMovies=getMoviesWatched().filter(function(m){return m.date===todayKey(ydm);});
+  var yestHtmlMovie=yMovies.length?'<div class="sub-block-hd" style="margin-top:16px;">📅 昨日观影（'+todayKey(ydm)+'）</div><div class="yest-box">'+yMovies.map(function(m){return '<div class="yest-item">🎬 '+esc(m.title)+(m.rating?(' · ⭐ '+m.rating):'')+'</div>';}).join("")+'</div>':'';
   wrap.innerHTML =
     '<h2 class="panel-title">🎬 影视存档本</h2>'+
     '<div class="panel-sub">值得收藏的影视作品</div>'+
@@ -485,7 +517,8 @@ function renderMovies(){
     '</div>'+
     '<div class="tabs" id="mvTabs">'+tabs+'</div>'+
     '<div class="sub-block-hd">🎬 已观看影片</div><div id="mvList">'+itemsHtml+'</div>'+
-    '<div class="sub-block-hd" style="margin-top:12px;">📝 片单备选清单</div><div id="mvWantList">'+wantHtml+'</div>';
+    '<div class="sub-block-hd" style="margin-top:12px;">📝 片单备选清单</div><div id="mvWantList">'+wantHtml+'</div>'+
+    yestHtmlMovie;
   bindMovies();
 }
 
@@ -619,6 +652,12 @@ function renderExercise(){
       '<div class="rb"><div>'+esc(r.log.note||'(无备注)')+'</div><div class="rm">'+exCalMonth.y+'-'+pad(exCalMonth.m+1)+'-'+r.day+(r.log.done?' · ✅':'')+'</div></div></label>';
   }  ).join(""):'<div class="empty-tip">本月暂无运动记录</div>';
 
+  // 昨日记录：展示前一天的运动打卡（仅确有数据时）
+  var yde=yesterdayDate(d), yEx2=getExerciseLog(yde);
+  var yestHtmlEx="";
+  if(yEx2&&(yEx2.done||(yEx2.note&&yEx2.note.trim()))){
+    yestHtmlEx='<div class="sub-block-hd" style="margin-top:16px;">📅 昨日运动（'+todayKey(yde)+'）</div><div class="yest-box"><div class="yest-item">🧘 '+(yEx2.done?'已打卡 ✓':'未打卡')+(yEx2.note?(' · '+esc(yEx2.note)):'')+'</div></div>';
+  }
   var xiaomiBlock = '<div class="sub-block-hd" style="margin-top:16px;">📲 小米运动健康</div>'+
     '<div class="quote-card plan-section" style="margin-bottom:10px;font-size:12px;color:var(--muted);">手动同步：导出今日状态可粘贴 / 分享到小米运动健康。自动双向同步需后端 + 小米开放平台授权，当前为纯前端。</div>'+
     '<div class="form-row"><button class="btn-primary" id="xiaoOpen">打开 App</button><button class="btn-ghost" id="xiaoExport">导出今日状态</button></div>';
@@ -634,6 +673,7 @@ function renderExercise(){
     '<button class="btn-primary" id="exSubmit">打卡 ✓</button></div>'+
     videoHtml+
     recsHtml+
+    yestHtmlEx+
     xiaomiBlock;
   bindExercise();
 }
@@ -777,6 +817,15 @@ function renderMoney(){
       '<span class="li-amt">¥'+esc((+m.amount).toFixed(2))+'</span>'+
       '<button class="btn-del" data-mdel="'+m.id+'">✕</button></label>';
   }).join("") : '<div class="empty-tip">还没有记账</div>';
+  // 昨日记录：展示前一天的记账明细与合计（仅确有数据时）
+  var ydm2=yesterdayDate(d), yMoney=getMoney().filter(function(x){return x.date===todayKey(ydm2);});
+  var yestHtmlMoney="";
+  if(yMoney.length){
+    var ySum=yMoney.reduce(function(s,x){return s+(+x.amount||0);},0);
+    yestHtmlMoney='<div class="sub-block-hd" style="margin-top:16px;">📅 昨日记账（'+todayKey(ydm2)+'）</div><div class="yest-box"><div class="yest-item">💰 共 '+yMoney.length+' 笔 · ¥'+ySum.toFixed(2)+'</div>'+
+      yMoney.map(function(m){return '<div class="yest-item">· '+moneyCatIcon(m.category)+' '+esc(moneyCatLabel(m.category))+(m.note?(' '+esc(m.note)):'')+' · ¥'+(+m.amount).toFixed(2)+'</div>';}).join("")+
+      '</div>';
+  }
   document.getElementById("m-money").innerHTML =
     '<h2 class="panel-title">💰 日常记账</h2>'+
     '<div class="panel-sub">金额 · 分类 · 备注</div>'+
@@ -792,7 +841,8 @@ function renderMoney(){
       '<button class="btn-primary" id="moneyAdd">+ 记一笔</button>'+
     '</div>'+
     '<div class="tabs" id="moneyTabs">'+tabs+'</div>'+
-    '<div id="moneyList">'+itemsHtml+'</div>';
+    '<div id="moneyList">'+itemsHtml+'</div>'+
+    yestHtmlMoney;
   bindMoney();
 }
 
@@ -1105,16 +1155,28 @@ function renderArticles(){
 function renderNote(){
   var d = new Date();
   var note = getNote(d);
+  // 昨日记录：展示前一天便签（只读）；今日为空时可一键复制为今日
+  var yd = yesterdayDate(d), yNote = getNote(yd);
+  var yestHtmlNote = "";
+  if(yNote && yNote.trim()){
+    var canCopy = !note || !note.trim();
+    yestHtmlNote = '<div class="sub-block-hd" style="margin-top:16px;">📅 昨日便签（'+todayKey(yd)+'）</div><div class="yest-box"><div class="yest-item">'+esc(yNote)+'</div>'+
+      (canCopy?'<div style="text-align:right;margin-top:4px;"><button class="btn-ghost" id="noteCopyYest">复制为今日</button></div>':'')+'</div>';
+  }
   document.getElementById("m-note").innerHTML =
     '<h2 class="panel-title">📝 今日便签</h2>'+
     '<div class="panel-sub">随手记 · 按天保存</div>'+
     '<div class="quote-card plan-section"><textarea id="noteArea" placeholder="今天的小灵感、小反思..." style="width:100%;min-height:200px;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;">'+esc(note)+'</textarea>'+
-    '<div style="text-align:right;margin-top:6px;"><button class="btn-primary" id="noteSave">保存</button></div></div>';
+    '<div style="text-align:right;margin-top:6px;"><button class="btn-primary" id="noteSave">保存</button></div></div>'+
+    yestHtmlNote;
   var sv = document.getElementById("noteSave");
   if(sv) sv.onclick = function(){setNote(d, document.getElementById("noteArea").value); alert("已保存 ✅");};
   // 自动保存 (blur)
   var ar = document.getElementById("noteArea");
   if(ar) ar.onblur = function(){setNote(d, ar.value);};
+  // 复制昨日便签为今日（仅当今日为空）
+  var cy = document.getElementById("noteCopyYest");
+  if(cy) cy.onclick = function(){ var area=document.getElementById("noteArea"); if(area){ area.value=yNote; setNote(d, yNote); showToast({title:"已复制昨日便签", text:""}); } };
 }
 
 /* ============ 半夜 00:00 自动刷新 ============ */
