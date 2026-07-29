@@ -1179,6 +1179,14 @@ function saveNavOrder(){
   var order = Array.prototype.slice.call(navScrollEl.querySelectorAll('.nav-item')).map(function(el){return el.getAttribute('data-target');});
   lsSetJSON('wb_nav_order', order);
 }
+function moveNav(item, dir){
+  if(!navScrollEl || !item) return;
+  var sib = dir<0 ? item.previousElementSibling : item.nextElementSibling;
+  if(!sib || !sib.classList.contains('nav-item')) return;
+  if(dir<0) navScrollEl.insertBefore(item, sib);
+  else navScrollEl.insertBefore(sib, item);
+  saveNavOrder();
+}
 function initNavOrder(){
   navScrollEl = document.getElementById('navScroll');
   if(!navScrollEl) return;
@@ -1195,8 +1203,19 @@ function initNavOrder(){
   } else {
     lsSetJSON('wb_nav_order', items.map(function(el){return el.getAttribute('data-target');}));
   }
+  // 添加上/下调整按钮（移动端可靠排序方式，避免触屏长按被滚动手势吞掉）
+  Array.prototype.slice.call(navScrollEl.querySelectorAll('.nav-item')).forEach(function(el){
+    if(el.querySelector('.nav-ud')) return;
+    var ud = document.createElement('span'); ud.className='nav-ud';
+    ud.innerHTML='<span class="nav-up" title="上移">▲</span><span class="nav-down" title="下移">▼</span>';
+    el.appendChild(ud);
+    ud.querySelector('.nav-up').addEventListener('click', function(e){ e.stopPropagation(); e.preventDefault(); moveNav(el,-1); });
+    ud.querySelector('.nav-down').addEventListener('click', function(e){ e.stopPropagation(); e.preventDefault(); moveNav(el,1); });
+  });
 }
 function onNavPointerDown(e){
+  if(e.target && e.target.closest && e.target.closest('.nav-ud')) return;            // 点箭头不触发拖拽
+  if(e.pointerType && e.pointerType!=='mouse' && e.pointerType!=='pen') return;      // 触屏用箭头排序，长按需拖拽留给桌面
   var item = (e.target && e.target.closest) ? e.target.closest('.nav-item') : null;
   if(!item || !navScrollEl || !navScrollEl.contains(item)) return;
   navDragEl = item;
