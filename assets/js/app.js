@@ -119,6 +119,7 @@ if(location.hash){
   var btn=document.querySelector('.nav-item[data-target="'+h+'"]');
   if(btn)btn.click();
 }
+
 }
 
 /* ============ 提醒 toast ============ */
@@ -616,7 +617,11 @@ function renderExercise(){
     return '<label class="record-card" data-exd="'+exCalMonth.y+'-'+pad(exCalMonth.m+1)+'-'+r.day+'">'+
       '<input type="checkbox" data-exdone="'+exCalMonth.y+'-'+pad(exCalMonth.m+1)+'-'+r.day+'" '+(r.log.reviewed?'checked':'')+'>'+
       '<div class="rb"><div>'+esc(r.log.note||'(无备注)')+'</div><div class="rm">'+exCalMonth.y+'-'+pad(exCalMonth.m+1)+'-'+r.day+(r.log.done?' · ✅':'')+'</div></div></label>';
-  }).join(""):'<div class="empty-tip">本月暂无运动记录</div>';
+  }  ).join(""):'<div class="empty-tip">本月暂无运动记录</div>';
+
+  var xiaomiBlock = '<div class="sub-block-hd" style="margin-top:16px;">📲 小米运动健康</div>'+
+    '<div class="quote-card plan-section" style="margin-bottom:10px;font-size:12px;color:var(--muted);">手动同步：导出今日状态可粘贴 / 分享到小米运动健康。自动双向同步需后端 + 小米开放平台授权，当前为纯前端。</div>'+
+    '<div class="form-row"><button class="btn-primary" id="xiaoOpen">打开 App</button><button class="btn-ghost" id="xiaoExport">导出今日状态</button></div>';
 
   document.getElementById("m-exercise").innerHTML =
     '<h2 class="panel-title">🧘 运动锻炼</h2>'+
@@ -628,7 +633,8 @@ function renderExercise(){
     '<div class="form-row"><input id="exNote" class="inp-text" placeholder="今天练了什么? 例如: 欧阳春晓30分钟" maxlength="60">'+
     '<button class="btn-primary" id="exSubmit">打卡 ✓</button></div>'+
     videoHtml+
-    recsHtml;
+    recsHtml+
+    xiaomiBlock;
   bindExercise();
 }
 
@@ -681,7 +687,49 @@ function bindExercise(){
       if(o){ o.reviewed = cb.checked; lsSetJSON("wb_exercise_log_"+dateKey, o); }
     };
   });
-}/* app.js part 6 — 日常记账(完整版：统计 + 分类 + 列表 + 筛选) + 存钱 + 树洞 */
+  // 小米运动健康：打开 App + 导出今日状态
+  var xo = document.getElementById("xiaoOpen");
+  if(xo) xo.onclick = openXiaomiHealth;
+  var xe = document.getElementById("xiaoExport");
+  if(xe) xe.onclick = exportDailyStatus;
+}
+
+/* ============ 小米运动健康（手动同步：导出今日状态 / 打开 App） ============ */
+function buildDailyStatusText(d){
+  var lines = ['【若惜工作台 · 每日状态 '+todayKey(d)+'】'];
+  var ex = getExerciseLog(d);
+  lines.push('🧘 运动：'+(ex&&ex.done?'已打卡 ✓':'未打卡')+(ex&&ex.note?(' · '+ex.note):''));
+  var reads = getReadLog().filter(function(e){return e.date===todayKey(d);}).length;
+  lines.push('📖 阅读：'+reads+' 章');
+  var mood = getMood(d);
+  if(mood && mood.mood) lines.push('😊 心情：'+mood.mood+(mood.note?(' · '+mood.note):''));
+  try{
+    var sl = buildSleep(d);
+    if(sl) lines.push('😴 睡眠建议：入睡 '+sl.bedtime+' · 起床 '+sl.wake);
+  }catch(_){}
+  return lines.join('\n');
+}
+function fallbackCopy(txt){
+  try{
+    var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    alert('今日状态已复制到剪贴板，可粘贴到小米运动健康');
+  }catch(_){ alert(txt); }
+}
+function exportDailyStatus(){
+  var txt = buildDailyStatusText(new Date());
+  if(navigator.share){
+    navigator.share({title:'若惜工作台·每日状态', text:txt}).catch(function(){});
+  } else if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ alert('今日状态已复制到剪贴板，可粘贴到小米运动健康'); }).catch(function(){ fallbackCopy(txt); });
+  } else { fallbackCopy(txt); }
+}
+function openXiaomiHealth(){
+  var storeUrl = 'https://app.mi.com/details?id=com.xiaomi.mihealth';
+  try{ window.location.href = 'mihealth://main'; }catch(_){}
+  setTimeout(function(){ try{ window.open(storeUrl, '_blank'); }catch(_){} }, 1200);
+}
 var moneyFilter = "all";
 
 function buildMoney(d){
@@ -1097,6 +1145,8 @@ function renderAll(){
 
 function startup(){
   setupNav();
+  initNavOrder();
+  initNavDrag();
   var savedTheme = ls("wb_theme");
   if(savedTheme) applyTheme(savedTheme);
   renderAll();
@@ -1122,4 +1172,89 @@ if(document.readyState === "loading"){
   startup();
 }
 
+/* ============ 侧边栏长按排序（顺序持久化） ============ */
+var navScrollEl=null, navDragEl=null, navPressTimer=null, navStartPt=null, navDragging=false, navSuppressClick=false;
+function saveNavOrder(){
+  if(!navScrollEl) return;
+  var order = Array.prototype.slice.call(navScrollEl.querySelectorAll('.nav-item')).map(function(el){return el.getAttribute('data-target');});
+  lsSetJSON('wb_nav_order', order);
+}
+function initNavOrder(){
+  navScrollEl = document.getElementById('navScroll');
+  if(!navScrollEl) return;
+  var items = Array.prototype.slice.call(navScrollEl.querySelectorAll('.nav-item'));
+  var saved = lsJSON('wb_nav_order', null);
+  if(saved && saved.length){
+    saved.forEach(function(id){
+      var el = navScrollEl.querySelector('.nav-item[data-target="'+id+'"]');
+      if(el) navScrollEl.appendChild(el);
+    });
+    items.forEach(function(el){
+      if(saved.indexOf(el.getAttribute('data-target'))<0) navScrollEl.appendChild(el);
+    });
+  } else {
+    lsSetJSON('wb_nav_order', items.map(function(el){return el.getAttribute('data-target');}));
+  }
+}
+function onNavPointerDown(e){
+  var item = (e.target && e.target.closest) ? e.target.closest('.nav-item') : null;
+  if(!item || !navScrollEl || !navScrollEl.contains(item)) return;
+  navDragEl = item;
+  navStartPt = {x:e.clientX, y:e.clientY};
+  navDragging = false;
+  navSuppressClick = false;
+  clearTimeout(navPressTimer);
+  navPressTimer = setTimeout(function(){
+    if(navDragEl){
+      navDragging = true;
+      navSuppressClick = true;
+      navDragEl.classList.add('dragging');
+      document.body.classList.add('nav-dragging');
+      try{ navDragEl.setPointerCapture(e.pointerId); }catch(_){}
+    }
+  }, 450);
+}
+function onNavPointerMove(e){
+  if(!navDragEl) return;
+  if(!navDragging){
+    if(navStartPt && (Math.abs(e.clientX-navStartPt.x)>8 || Math.abs(e.clientY-navStartPt.y)>8)) clearTimeout(navPressTimer);
+    return;
+  }
+  if(e.cancelable) e.preventDefault();
+  navDragEl.style.visibility = 'hidden';
+  var under = document.elementFromPoint(e.clientX, e.clientY);
+  navDragEl.style.visibility = '';
+  var target = under ? (under.closest ? under.closest('.nav-item') : null) : null;
+  if(target && target!==navDragEl && navScrollEl.contains(target)){
+    var r = target.getBoundingClientRect();
+    if((e.clientY - r.top) < r.height/2) navScrollEl.insertBefore(navDragEl, target);
+    else navScrollEl.insertBefore(navDragEl, target.nextSibling);
+  }
+}
+function onNavPointerUp(e){
+  clearTimeout(navPressTimer);
+  if(navDragEl && navDragging){
+    navDragEl.classList.remove('dragging');
+    document.body.classList.remove('nav-dragging');
+    saveNavOrder();
+  }
+  if(navDragEl){ try{ navDragEl.releasePointerCapture(e.pointerId); }catch(_){} }
+  if(navDragging){
+    navDragging = false;
+    setTimeout(function(){ navSuppressClick=false; }, 0); // 若浏览器未合成 click 则复位
+  }
+  navDragEl = null;
+}
+function onNavClickCapture(e){
+  if(navSuppressClick){ e.stopPropagation(); e.preventDefault(); navSuppressClick=false; }
+}
+function initNavDrag(){
+  if(!navScrollEl) navScrollEl = document.getElementById('navScroll');
+  if(!navScrollEl) return;
+  navScrollEl.addEventListener('pointerdown', onNavPointerDown);
+  document.addEventListener('pointermove', onNavPointerMove, {passive:false});
+  document.addEventListener('pointerup', onNavPointerUp);
+  document.addEventListener('pointercancel', onNavPointerUp);
+  document.addEventListener('click', onNavClickCapture, true);
+}
 })();
