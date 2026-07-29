@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#9b6cff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="若惜工作台">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <title>若惜工作台</title>
+</head>
+<body>
+  <div id="app">
+    <header id="header"></header>
+    <div class="layout">
+      <aside class="taskbar" id="taskbar">
+        <div class="brand">
+          <div class="brand-logo">🌸</div>
+          <div class="brand-name">若惜</div>
+          <div class="brand-sub">Daily Workbench</div>
+        </div>
+        <nav class="nav-scroll" id="navScroll">
+          <button class="nav-item active" data-target="m-plan"><span class="nav-ico">📅</span><span class="nav-t">每日计划</span></button>
+          <button class="nav-item" data-target="m-mood"><span class="nav-ico">💗</span><span class="nav-t">心情记录</span></button>
+          <button class="nav-item" data-target="m-reading"><span class="nav-ico">📖</span><span class="nav-t">读书记录</span></button>
+          <button class="nav-item" data-target="m-movie"><span class="nav-ico">🎬</span><span class="nav-t">观影记录</span></button>
+          <button class="nav-item" data-target="m-exercise"><span class="nav-ico">🧘</span><span class="nav-t">运动锻炼</span></button>
+          <button class="nav-item" data-target="m-money"><span class="nav-ico">💰</span><span class="nav-t">日常记账</span></button>
+          <button class="nav-item" data-target="m-saving"><span class="nav-ico">🏦</span><span class="nav-t">存钱计划</span></button>
+          <button class="nav-item" data-target="m-tree"><span class="nav-ico">🌳</span><span class="nav-t">树洞</span></button>
+          <button class="nav-item" data-target="m-history"><span class="nav-ico">📚</span><span class="nav-t">历史记录</span></button>
+          <button class="nav-item" data-target="m-sleep"><span class="nav-ico">🌙</span><span class="nav-t">睡眠管理</span></button>
+          <button class="nav-item" data-target="m-skincare"><span class="nav-ico">💧</span><span class="nav-t">护肤提醒</span></button>
+          <button class="nav-item" data-target="m-articles"><span class="nav-ico">🔋</span><span class="nav-t">三电英语</span></button>
+          <button class="nav-item" data-target="m-note"><span class="nav-ico">📝</span><span class="nav-t">今日便签</span></button>
+          <button class="nav-item" data-target="m-settings"><span class="nav-ico">⚙️</span><span class="nav-t">设置</span></button>
+        </nav>
+        <div class="taskbar-foot">v3 · 梦幻紫</div>
+      </aside>
+      <main class="content" id="content">
+        <section id="m-plan" class="card panel active"></section>
+        <section id="m-mood" class="card panel"></section>
+        <section id="m-reading" class="card panel"></section>
+        <section id="m-movie" class="card panel"></section>
+        <section id="m-exercise" class="card panel"></section>
+        <section id="m-money" class="card panel"></section><section id="m-saving" class="card panel"></section>
+        <section id="m-tree" class="card panel"></section>
+        <section id="m-history" class="card panel"></section>
+        <section id="m-sleep" class="card panel"></section>
+        <section id="m-skincare" class="card panel"></section>
+        <section id="m-articles" class="card panel"></section>
+        <section id="m-note" class="card panel"></section>
+        <section id="m-settings" class="card panel"></section>
+      </main>
+    </div>
+  </div>
+
+  <!-- 抽屉遮罩 -->
+  <div class="backdrop" id="backdrop"></div>
+
+  <!-- 弹窗 -->
+  <div id="modal" class="modal">
+    <div class="modal-card">
+      <button class="modal-close" aria-label="关闭">×</button>
+      <div class="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/content.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
