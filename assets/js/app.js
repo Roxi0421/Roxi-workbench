@@ -340,9 +340,6 @@ function bindMood(){
     };
   });
 }/* app.js part 3 — 阅读(buildReading / renderReading / 章节勾选) */
-var READING_ANCHOR = new Date(2026, 6, 27); // 2026-07-27
-var READING_WIN = 30;
-
 function getMonthBooks(d){
   var books = CFG.reading.books.slice(0, CFG.reading.booksPerMonth);
   var first = CFG.reading.firstBook;
@@ -350,78 +347,35 @@ function getMonthBooks(d){
   return books;
 }
 
-function dayWeight(d){
-  var w = d.getDay();
-  // 周末多读,工作日少读;周一三五中等,周二四少
-  if(w===0||w===6) return 3;
-  if(w===1||w===3||w===5) return 1;
-  return 0;
-}
-
 function buildReading(d){
-  var a = startOfDay(d);
-  var off = Math.round((a - READING_ANCHOR)/86400000);
-  var dayOfWindow = Math.max(1, Math.min(READING_WIN, off+1));
   var books = getMonthBooks(d);
   var flat = [];
   books.forEach(function(b){ b.chapters.forEach(function(c){ flat.push({book:b, ch:c}); }); });
   var total = flat.length;
-  var counts = [];
-  for(var i=0;i<READING_WIN;i++){
-    var dd = new Date(READING_ANCHOR.getFullYear(), READING_ANCHOR.getMonth(), READING_ANCHOR.getDate()+i);
-    counts.push(dayWeight(dd));
-  }
-  var cnt = counts[dayOfWindow-1] || 0;
   var done = getReadDone();
-  var keyOf = function(i){ return flat[i].book.title+"#"+flat[i].ch.n; };
-  var start = 0;
-  while(start<total && done.has(keyOf(start))) start++;
-  var todayChapters = [];
-  for(var j=start;j<total && todayChapters.length<cnt;j++){
-    var gi = keyOf(j);
-    if(!done.has(gi)) todayChapters.push({book:flat[j].book, ch:flat[j].ch, gi:gi});
-  }
-  // 后续阅读计划：今日批次之后的前瞻章节（路线图，最多展示 LOOK 章）
-  var LOOK = 10;
-  var future = [];
-  for(var f=start+todayChapters.length; f<total && future.length<LOOK; f++){
-    future.push({book:flat[f].book, ch:flat[f].ch, gi:keyOf(f)});
-  }
-  return {dayOfWindow:dayOfWindow, daysInWindow:READING_WIN, books:books, todayChapters:todayChapters, future:future, done:done.size, total:total, isLast:dayOfWindow>=READING_WIN};
+  var keyOf = function(it){ return it.book.title+"#"+it.ch.n; };
+  var all = flat.map(function(it){ return {book:it.book, ch:it.ch, gi:keyOf(it), isDone:done.has(keyOf(it))}; });
+  var unread = all.filter(function(x){ return !x.isDone; });
+  var read = all.filter(function(x){ return x.isDone; });
+  return {books:books, all:all, unread:unread, read:read, done:done.size, total:total};
 }
 
 function renderReading(){
   var d = new Date();
   var rd = buildReading(d);
   var wrap = document.getElementById("m-reading");
-  var chapters = "";
-  if(rd.todayChapters.length===0){
-    chapters = '<div class="rest">前面的章节都读完啦，享受休息日吧 🌿</div>';
-  } else {
-    rd.todayChapters.forEach(function(item){
-      chapters += '<div class="chapter" data-readk="'+item.gi+'">'+
-        '<label class="rcheck"><input type="checkbox" data-read="'+item.gi+'" data-total="'+rd.total+'"></label>'+
-        '<div class="rc-body">'+
-        '<div class="rc-t">《'+esc(item.book.title)+'》第 '+item.ch.n+' 章 · '+esc(item.ch.title)+'</div>'+
-        '<div class="rc-sum">'+esc(item.ch.summary||"")+'</div>'+
-        '<div class="rc-thought">❓ 思考：'+esc(item.ch.thought||"")+'</div>'+
-        '</div></div>';
-    });
-  }
   var pct = rd.total?Math.round(rd.done/rd.total*100):0;
-  // 后续阅读计划（前瞻路线图），勾选后随进度实时推进
-  var futureHtml = "";
-  if(rd.future && rd.future.length){
-    futureHtml =
-      '<div class="sub-block-hd" style="margin-top:14px;">📌 后续阅读计划（前瞻 '+rd.future.length+' 章）</div>'+
-      '<div class="road-list">'+
-      rd.future.map(function(it){
-        return '<div class="road-item"><span class="road-bk">《'+esc(it.book.title)+'》</span> 第 '+it.ch.n+' 章 · '+esc(it.ch.title)+'</div>';
-      }).join("")+
-      '</div>';
-  } else {
-    futureHtml = '<div class="sub-block-hd" style="margin-top:14px;">📌 后续阅读计划</div><div class="rest">全部章节已排入计划，按计划推进即可 🌟</div>';
+  function chapItem(it){
+    return '<div class="chapter'+(it.isDone?' done':'')+'" data-readk="'+it.gi+'">'+
+      '<label class="rcheck"><input type="checkbox" data-read="'+it.gi+'" data-total="'+rd.total+'" '+(it.isDone?'checked':'')+'></label>'+
+      '<div class="rc-body">'+
+      '<div class="rc-t">《'+esc(it.book.title)+'》第 '+it.ch.n+' 章 · '+esc(it.ch.title)+'</div>'+
+      '<div class="rc-sum">'+esc(it.ch.summary||"")+'</div>'+
+      '<div class="rc-thought">❓ 思考：'+esc(it.ch.thought||"")+'</div>'+
+      '</div></div>';
   }
+  var unreadHtml = rd.unread.length ? rd.unread.map(chapItem).join("") : '<div class="rest">全部章节都读完啦，享受回味 🌟</div>';
+  var readHtml = rd.read.length ? '<div class="sub-block-hd" style="margin-top:14px;">✅ 已读章节（'+rd.read.length+' 章 · 可取消勾选）</div>'+rd.read.map(chapItem).join("") : '';
   // 昨日阅读：按阅读日志里日期=昨天的条目统计（仅确有数据时展示）
   var yd2=yesterdayDate(d), ykey2=todayKey(yd2);
   var yReads=getReadLog().filter(function(e){return e.date===ykey2;});
@@ -432,12 +386,12 @@ function renderReading(){
   }
   wrap.innerHTML =
     '<h2 class="panel-title">📖 读书记录</h2>'+
-    '<div class="panel-sub">本月书单 · 未读完次日顺延 · '+CFG.reminders.reading+' 提醒 <button type="button" class="btn-ghost" id="rdRemindBtn">开启桌面提醒</button></div>'+
+    '<div class="panel-sub">本月书单 · 读了就勾选，没读就不勾选 · '+CFG.reminders.reading+' 提醒 <button type="button" class="btn-ghost" id="rdRemindBtn">开启桌面提醒</button></div>'+
     '<div class="sub-block-hd">📚 本月书单：'+rd.books.map(function(b){return '《'+esc(b.title)+'》';}).join("、")+'</div>'+
-    '<div class="quote-card" style="margin-bottom:12px;">📖 阅读第 <b>'+rd.dayOfWindow+'</b> / '+rd.daysInWindow+' 天</div>'+
     '<div class="quote-card plan-section" style="margin-bottom:12px;">📊 最近7天小计：阅读 <b>'+sum7read()+'</b> 章</div>'+
-    chapters+
-    futureHtml+
+    '<div class="sub-block-hd">📌 后续章节（待读 '+rd.unread.length+' 章）</div>'+
+    unreadHtml+
+    readHtml+
     '<div class="goal"><div class="bar"><div class="bar-fill" style="width:'+pct+'%"></div></div>'+
     '<div class="goal-sub">已完成 '+rd.done+' / '+rd.total+' 章 · '+pct+'%</div></div>'+
     yestHtmlRead;
@@ -446,7 +400,7 @@ function renderReading(){
     cb.onchange = function(){
       var gi = cb.getAttribute('data-read');
       setReadDone(gi, cb.checked);   // 写入完成集合 + 阅读日志（按天计入历史）
-      renderReading();              // 刷新：今日列表 + 进度 + 后续阅读计划（实时推进）
+      renderReading();              // 刷新：后续章节 + 进度 + 昨日阅读（实时更新）
       renderHistory();              // 同步历史记录面板
     };
   });
