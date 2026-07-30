@@ -247,11 +247,18 @@ function tickCountdown(){
   var el=document.getElementById("countdown");
   if(!el)return;
   var d=new Date();
-  var now=d.getHours()*60+d.getMinutes();
-  var end=parseTime(CFG.profile.workEnd);
-  var rem=end-now;
-  if(rem<=0){el.textContent="🎉 已下班，好好休息~";return;}
-  el.textContent="⏳ 下班倒计时 "+pad(Math.floor(rem/60))+":"+pad(rem%60);
+  var endMin=parseTime(CFG.profile.workEnd);
+  var endDt=new Date(d.getFullYear(),d.getMonth(),d.getDate(),Math.floor(endMin/60),endMin%60,0,0);
+  var remMs=endDt-d.getTime();
+  if(remMs<=0){el.innerHTML="🎉 已下班，好好休息~";return;}
+  var ms=remMs%1000;
+  var totalSec=Math.floor(remMs/1000);
+  var ss=totalSec%60;
+  var mm=Math.floor(totalSec/60)%60;
+  var hh=Math.floor(totalSec/3600);
+  var ms3=("00"+ms).slice(-3);
+  var t=(hh>0?pad(hh)+":":"")+pad(mm)+":"+pad(ss)+'<span class="cd-ms">.'+ms3+'</span>';
+  el.innerHTML="⏳ 下班倒计时 <b>"+t+"</b>";
 }
 
 function renderPlan(){
@@ -293,7 +300,7 @@ function renderPlan(){
   if(b.dones.length===0){doneEl.innerHTML='<div class="empty-tip">还没已完成的任务</div>';}
   else{doneEl.innerHTML=b.dones.map(function(t){return '<label class="li done" data-wti="'+t.id+'"><input type="checkbox" data-wt="'+t.id+'" checked><span class="li-body">'+esc(t.text)+'</span></label>';}).join("");}
   bindPlan();
-  if(wd){if(countdownTimer)clearInterval(countdownTimer);tickCountdown();countdownTimer=setInterval(tickCountdown,1000);}
+  if(wd){if(countdownTimer)clearInterval(countdownTimer);tickCountdown();countdownTimer=setInterval(tickCountdown,40);}
 }
 
 function bindPlan(){

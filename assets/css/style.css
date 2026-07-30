@@ -245,6 +245,7 @@ body.nav-dragging .nav-item { cursor: grabbing; }
 .countdown { margin-top: 12px; background: linear-gradient(135deg, #fff0f5, #ffe6ef); border: 1px solid var(--line);
   border-radius: 12px; padding: 10px 12px; font-size: 13.5px; font-weight: 600; color: var(--brand); }
 .countdown b { font-size: 18px; font-variant-numeric: tabular-nums; margin-left: 4px; }
+.countdown .cd-ms { font-size: 13px; color: var(--muted); font-weight: 600; }
 .wt-module { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
 .wt-hd { font-weight: 800; font-size: 14px; margin-bottom: 8px; }
 .wt-add { display: flex; gap: 8px; margin-bottom: 10px; }
