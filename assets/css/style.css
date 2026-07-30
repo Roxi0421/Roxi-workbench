@@ -633,11 +633,14 @@ body.nav-dragging .nav-item { cursor: grabbing; }
 
 /* 便签 / 树洞条目 */
 .note-item {
+  display: flex; align-items: flex-start; gap: 8px;
   background: #fff; border: 1px solid var(--line); border-radius: 12px;
   padding: 10px 12px; margin-bottom: 6px;
   font-size: 13px; color: var(--ink);
 }
-.note-item .nm { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.note-item input[type="checkbox"] { width: 16px; height: 16px; margin-top: 2px; flex: 0 0 auto; accent-color: var(--brand); }
+.note-item .nt-text { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
+.note-item .nm { font-size: 11px; color: var(--muted); margin-top: 4px; flex-basis: 100%; }
 .note-item.done { text-decoration: line-through; opacity: .55; }
 
 /* 头条目 */

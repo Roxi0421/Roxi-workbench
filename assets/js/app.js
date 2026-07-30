@@ -967,8 +967,9 @@ function renderTree(){
   var list = getTree();
   var itemsHtml = list.length?list.map(function(t){
     return '<label class="note-item'+(t.done?' done':'')+'" data-tid="'+t.id+'">'+
-      '<input type="checkbox" data-tdone="'+t.id+'" '+(t.done?'checked':'')+'> '+
-      esc(t.text)+'<div class="nm">'+esc(t.date)+'</div></label>';
+      '<input type="checkbox" data-tdone="'+t.id+'" '+(t.done?'checked':'')+'>'+
+      '<span class="nt-text">'+esc(t.text)+'</span>'+
+      '<div class="nm">'+esc(t.date)+'</div></label>';
   }).join(""):'<div class="empty-tip">树洞空空,说点什么吧~</div>';
   document.getElementById("m-tree").innerHTML =
     '<h2 class="panel-title">🌳 树洞</h2>'+
