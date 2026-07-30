@@ -88,6 +88,52 @@ function getExerciseLog(d){return lsJSON(exerciseLogKey(d),null);}
 function setExerciseLog(d,o){lsSetJSON(exerciseLogKey(d),o);}
 function exerciseLogMonth(year,month){var prefix="wb_exercise_log_"+year+"-"+pad(month+1);var out={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(prefix)===0){var day=parseInt(k.replace(prefix,""),10);if(!isNaN(day))out[day]=lsJSON(k,null);}}return out;}
 
+/* 每周训练计划（按天保存每个动作的完成状态） */
+function planKeyStr(s){return "wb_exercise_plan_"+s;}
+function getPlanDoneByKey(s){return lsJSON(planKeyStr(s),{});}
+function setPlanDoneByKey(s,id,done){var o=getPlanDoneByKey(s);if(done)o[id]=true;else delete o[id];lsSetJSON(planKeyStr(s),o);}
+function syncPlanToLog(d){
+  var pd=getPlanDoneByKey(todayKey(d));
+  var cnt=0; for(var k in pd){ if(pd[k]) cnt++; }
+  var ex=getExerciseLog(d)||{done:false,note:""};
+  if(cnt>0) ex.done=true;          // 计划里有勾选 → 当天视为已运动；不覆盖已有备注
+  setExerciseLog(d,ex);
+}
+function buildWorkoutPlan(){
+  var plan=CFG.workoutPlan||[];
+  var now=new Date();
+  var dow=now.getDay(); // 0=周日..6=周六
+  var mondayOffset=(dow===0?-6:1-dow);
+  var monday=new Date(now.getFullYear(),now.getMonth(),now.getDate()+mondayOffset);
+  return plan.map(function(tpl,i){
+    var dt=new Date(monday.getFullYear(),monday.getMonth(),monday.getDate()+i);
+    var isToday=(dt.getFullYear()===now.getFullYear()&&dt.getMonth()===now.getMonth()&&dt.getDate()===now.getDate());
+    var done=getPlanDoneByKey(todayKey(dt));
+    var exs=(tpl.exercises||[]).map(function(e){return {e:e,checked:!!done[e.id]};});
+    var doneCount=0; exs.forEach(function(x){if(x.checked)doneCount++;});
+    return {tpl:tpl,date:dt,dateKey:todayKey(dt),isToday:isToday,exs:exs,doneCount:doneCount,total:exs.length};
+  });
+}
+function workoutPlanHtml(){
+  var wk=buildWorkoutPlan();
+  var cards=wk.map(function(w){
+    var exItems=w.exs.map(function(x){
+      return '<label class="wk-ex'+(x.checked?' done':'')+'">'+
+        '<input type="checkbox" data-plan-date="'+w.dateKey+'" data-plan-id="'+x.e.id+'" '+(x.checked?'checked':'')+'>'+
+        '<span class="wk-ex-name">'+esc(x.e.name)+'</span>'+
+        '<span class="wk-ex-rep">'+x.e.sets+' 组 × '+esc(x.e.reps)+'</span></label>';
+    }).join("");
+    return '<div class="wk-day'+(w.isToday?' today':'')+'">'+
+      '<div class="wk-day-hd"><span class="wk-emo">'+w.tpl.emoji+'</span>'+
+      '<span class="wk-name">'+w.tpl.day+' · '+esc(w.tpl.focus)+'</span>'+
+      (w.isToday?'<span class="wk-today">今天</span>':'')+
+      '<span class="wk-count">'+w.doneCount+'/'+w.total+'</span></div>'+
+      (w.tpl.tag?'<div class="wk-tag">'+esc(w.tpl.tag)+'</div>':'')+
+      '<div class="wk-ex-list">'+exItems+'</div></div>';
+  }).join("");
+  return '<div class="sub-block-hd" style="margin-top:14px;">🏋️ 本周训练计划（做了哪个勾哪个）</div><div class="wk-plan">'+cards+'</div>';
+}
+
 /* 记账 */
 function getMoney(){return lsJSON("wb_money",[]);}
 function setMoney(a){lsSetJSON("wb_money",a);}
@@ -584,6 +630,8 @@ function renderExercise(){
   // 目标盒
   var goalBox = '<div class="goal-box"><div class="gt">🎯 当前目标：'+esc(b.goal.goalTitle||'塑形改善腿型 + 拯救胯宽拜拜肉')+'</div>'+
     '<div class="goal-tags">'+(b.goal.goalTags||['瘦腿直腿','改善假胯宽','手臂紧致','核心塑形']).map(function(t){return '<span class="goal-tag">'+esc(t)+'</span>';}).join("")+'</div></div>';
+  // 本周训练计划（做了哪个勾哪个）
+  var planHtml = workoutPlanHtml();
   // 最近7天小计
   var ex7 = sum7exercise();
   var sum7html = '<div class="quote-card plan-section" style="margin-bottom:14px;">📊 最近7天小计：运动打卡 <b>'+ex7.done+'</b> 天 · 记录 '+ex7.rec+' 条</div>';
@@ -606,11 +654,16 @@ function renderExercise(){
       '<div class="rb"><div>'+esc(r.log.note||'(无备注)')+'</div><div class="rm">'+exCalMonth.y+'-'+pad(exCalMonth.m+1)+'-'+r.day+(r.log.done?' · ✅':'')+'</div></div></label>';
   }  ).join(""):'<div class="empty-tip">本月暂无运动记录</div>';
 
-  // 昨日记录：展示前一天的运动打卡（仅确有数据时）
+  // 昨日记录：展示前一天的运动（计划完成数 + 打卡备注，仅确有数据时）
   var yde=yesterdayDate(d), yEx2=getExerciseLog(yde);
+  var yPlan=getPlanDoneByKey(todayKey(yde));
+  var yPlanCount=0; for(var ypk in yPlan){ if(yPlan[ypk]) yPlanCount++; }
   var yestHtmlEx="";
-  if(yEx2&&(yEx2.done||(yEx2.note&&yEx2.note.trim()))){
-    yestHtmlEx='<div class="sub-block-hd" style="margin-top:16px;">📅 昨日运动（'+todayKey(yde)+'）</div><div class="yest-box"><div class="yest-item">🧘 '+(yEx2.done?'已打卡 ✓':'未打卡')+(yEx2.note?(' · '+esc(yEx2.note)):'')+'</div></div>';
+  if((yEx2&&(yEx2.done||(yEx2.note&&yEx2.note.trim()))) || yPlanCount>0){
+    var yparts=[];
+    if(yPlanCount>0) yparts.push('完成 '+yPlanCount+' 个动作');
+    if(yEx2&&yEx2.note) yparts.push(yEx2.note);
+    yestHtmlEx='<div class="sub-block-hd" style="margin-top:16px;">📅 昨日运动（'+todayKey(yde)+'）</div><div class="yest-box"><div class="yest-item">🧘 '+(yparts.join(' · ')||'已打卡')+'</div></div>';
   }
   var xiaomiBlock = '<div class="sub-block-hd" style="margin-top:16px;">📲 小米运动健康</div>'+
     '<div class="quote-card plan-section" style="margin-bottom:10px;font-size:12px;color:var(--muted);">手动同步：导出今日状态可粘贴 / 分享到小米运动健康。自动双向同步需后端 + 小米开放平台授权，当前为纯前端。</div>'+
@@ -620,6 +673,7 @@ function renderExercise(){
     '<h2 class="panel-title">🧘 运动锻炼</h2>'+
     '<div class="panel-sub">每日打卡 · 塑形跟练 · 19:00 开始</div>'+
     goalBox+
+    planHtml+
     sum7html+
     cal+
     '<div class="sub-block-hd" style="margin-top:14px;">📝 记录今日运动</div>'+
@@ -679,6 +733,18 @@ function bindExercise(){
       var dateKey = cb.getAttribute("data-exdone");
       var o = lsJSON("wb_exercise_log_"+dateKey, null);
       if(o){ o.reviewed = cb.checked; lsSetJSON("wb_exercise_log_"+dateKey, o); }
+    };
+  });
+  // 每周训练计划：勾选某个动作 → 按天保存 + 同步当日运动打卡
+  document.querySelectorAll("#m-exercise input[data-plan-id]").forEach(function(cb){
+    cb.onchange = function(){
+      var dt = cb.getAttribute("data-plan-date");
+      var id = cb.getAttribute("data-plan-id");
+      var p = dt.split("-");
+      var dd = new Date(+p[0], +p[1]-1, +p[2]);
+      setPlanDoneByKey(dt, id, cb.checked);
+      syncPlanToLog(dd);
+      renderExercise();
     };
   });
   // 小米运动健康：打开 App + 导出今日状态

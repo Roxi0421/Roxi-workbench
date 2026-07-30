@@ -44,6 +44,64 @@ window.WB_CONFIG = {
     goodMinSleepQuality: 4
   },
 
+  /* ---------- 每周训练计划（做了哪个勾哪个，按天保存） ---------- */
+  workoutPlan: [
+    { day: "周一", emoji: "🍑", focus: "臀腿", tag: "瘦腿直腿 · 改善假胯宽",
+      exercises: [
+        { id: "mon-1", name: "徒手深蹲", sets: 4, reps: "15 次" },
+        { id: "mon-2", name: "臀桥", sets: 4, reps: "20 次" },
+        { id: "mon-3", name: "侧卧抬腿", sets: 3, reps: "20 次/侧" },
+        { id: "mon-4", name: "向后箭步蹲", sets: 3, reps: "12 次/侧" },
+        { id: "mon-5", name: "蚌式开合", sets: 3, reps: "20 次/侧" }
+      ] },
+    { day: "周二", emoji: "💪", focus: "肩背", tag: "薄背 · 改善圆肩",
+      exercises: [
+        { id: "tue-1", name: "弹力带划船", sets: 4, reps: "15 次" },
+        { id: "tue-2", name: "俯卧挺身（超人式）", sets: 3, reps: "15 次" },
+        { id: "tue-3", name: "招财猫（肩外旋）", sets: 3, reps: "15 次" },
+        { id: "tue-4", name: "靠墙天使", sets: 3, reps: "12 次" },
+        { id: "tue-5", name: "猫牛式拉伸", sets: 2, reps: "10 次" }
+      ] },
+    { day: "周三", emoji: "🔥", focus: "核心 + 有氧", tag: "燃脂 · 收紧腰腹",
+      exercises: [
+        { id: "wed-1", name: "卷腹", sets: 3, reps: "20 次" },
+        { id: "wed-2", name: "平板支撑", sets: 3, reps: "45 秒" },
+        { id: "wed-3", name: "俄罗斯转体", sets: 3, reps: "20 次" },
+        { id: "wed-4", name: "登山跑", sets: 3, reps: "30 秒" },
+        { id: "wed-5", name: "开合跳", sets: 3, reps: "40 次" }
+      ] },
+    { day: "周四", emoji: "✨", focus: "手臂（拜拜肉）", tag: "紧致手臂线条",
+      exercises: [
+        { id: "thu-1", name: "颈后臂屈伸", sets: 3, reps: "15 次" },
+        { id: "thu-2", name: "俯身臂屈伸", sets: 3, reps: "15 次/侧" },
+        { id: "thu-3", name: "二头弯举", sets: 3, reps: "15 次" },
+        { id: "thu-4", name: "墙壁俯卧撑", sets: 3, reps: "12 次" },
+        { id: "thu-5", name: "招财猫", sets: 3, reps: "15 次" }
+      ] },
+    { day: "周五", emoji: "🍑", focus: "臀腿强化", tag: "翘臀 · 提臀线",
+      exercises: [
+        { id: "fri-1", name: "保加利亚分腿蹲", sets: 3, reps: "12 次/侧" },
+        { id: "fri-2", name: "跪姿后踢腿", sets: 3, reps: "20 次/侧" },
+        { id: "fri-3", name: "单腿臀桥", sets: 3, reps: "15 次/侧" },
+        { id: "fri-4", name: "螃蟹步（弹力带）", sets: 3, reps: "20 步" },
+        { id: "fri-5", name: "深蹲跳", sets: 3, reps: "12 次" }
+      ] },
+    { day: "周六", emoji: "🌟", focus: "全身 + 有氧", tag: "代谢 · 整体塑形",
+      exercises: [
+        { id: "sat-1", name: "开合跳", sets: 3, reps: "40 次" },
+        { id: "sat-2", name: "高抬腿", sets: 3, reps: "30 秒" },
+        { id: "sat-3", name: "波比跳", sets: 3, reps: "10 次" },
+        { id: "sat-4", name: "平板支撑", sets: 3, reps: "60 秒" },
+        { id: "sat-5", name: "徒手深蹲", sets: 3, reps: "20 次" }
+      ] },
+    { day: "周日", emoji: "🧘", focus: "休息 / 拉伸", tag: "放松恢复",
+      exercises: [
+        { id: "sun-1", name: "全身拉伸", sets: 2, reps: "5 分钟" },
+        { id: "sun-2", name: "婴儿式", sets: 1, reps: "2 分钟" },
+        { id: "sun-3", name: "猫牛式", sets: 2, reps: "10 次" }
+      ] }
+  ],
+
   /* ---------- 睡眠管理 ---------- */
   sleep: {
     defaultBedtime: "22:30",
