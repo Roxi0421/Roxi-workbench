@@ -576,6 +576,14 @@ body.nav-dragging .nav-item { cursor: grabbing; }
 .li input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; }
 .empty-tip { text-align: center; color: var(--muted); font-size: 12.5px; padding: 18px 0; }
 
+/* 观影推荐片单 */
+.reco-group { margin-top: 10px; }
+.reco-group > .sub-block-hd { display: flex; align-items: center; justify-content: space-between; }
+.reco-list { display: flex; flex-direction: column; }
+.reco-prog { font-size: 11px; color: var(--brand); font-weight: 700; background: var(--brand-soft); padding: 1px 9px; border-radius: 999px; margin-left: 8px; }
+.reco-item { gap: 10px; }
+.reco-item input[type=checkbox] { flex: 0 0 auto; }
+
 /* 今日计划子板块 */
 .plan-section { margin-bottom: 14px; }
 .exercise-check {

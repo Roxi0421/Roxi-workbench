@@ -463,7 +463,7 @@ function renderReading(){
   });
   var rb = document.getElementById('rdRemindBtn'); if(rb) rb.onclick = requestRemindPerm;
 }/* app.js part 4 — 观影记录(完整版：统计卡 + 筛选 + 已看/想看 双列表 + 增删改) */
-var movieFilter = "all";
+var movieSub = "variety"; // 观影子页：variety / movie / tv / anime / reco
 
 function buildMovies(){
   var watched = getMoviesWatched();
@@ -480,33 +480,20 @@ function movieTypeIcon(id){
   var t = (CFG.movieTypes||[]).find(function(x){return x.id===id;}); return t?t.icon:"🎬";
 }
 
+/* 推荐片单：已看勾选状态（键为 reco id） */
+function getMovieRecoDone(){return lsJSON("wb_movie_reco_done",{});}
+function setMovieRecoDone(o){lsSetJSON("wb_movie_reco_done",o);}
+
 function renderMovies(){
   var d = new Date();
   var b = buildMovies();
   var wrap = document.getElementById("m-movie");
-  var cats = (CFG.movieTypes||[]).map(function(t){return '<button class="tab'+(movieFilter===t.id?' active':'')+'" data-mf="'+t.id+'">'+t.icon+' '+t.label+'</button>';}).join("");
-  var tabs = '<button class="tab'+(movieFilter==='all'?' active':'')+'" data-mf="all">全部</button>'+cats;
-  var list = b.watched;
-  if(movieFilter!=='all') list = list.filter(function(m){return m.type===movieFilter;});
-  var itemsHtml = list.length?list.map(function(m){
-    return '<div class="li" data-mid="'+m.id+'">'+
-      '<span style="font-size:18px;">'+movieTypeIcon(m.type)+'</span>'+
-      '<div class="li-body"><div>'+esc(m.title)+' <span class="vtag bilibili" style="background:#a48cff">'+movieTypeLabel(m.type)+'</span> '+(m.rating?'⭐ '+m.rating:'')+'</div>'+
-      '<div class="li-meta">'+esc(m.date||"")+(m.note?' · '+esc(m.note):'')+'</div></div>'+
-      '<div class="li-actions"><button class="btn-edit" data-med="'+m.id+'">编辑</button><button class="btn-del" data-mdd="'+m.id+'">删</button></div></div>';
-  }).join("") : '<div class="empty-tip">还没有已观看影片</div>';
-  var wantHtml = b.want.length?b.want.map(function(m){
-    return '<div class="li" data-mwid="'+m.id+'">'+
-      '<span style="font-size:18px;">'+movieTypeIcon(m.type)+'</span>'+
-      '<div class="li-body"><div>'+esc(m.title)+' <span class="vtag bilibili" style="background:#a48cff">'+movieTypeLabel(m.type)+'</span></div>'+
-      '<div class="li-meta">'+esc(m.note||"")+'</div></div>'+
-      '<div class="li-actions"><button class="btn-edit" data-mwok="'+m.id+'">已看</button><button class="btn-del" data-mwdd="'+m.id+'">删</button></div></div>';
-  }).join("") : '<div class="empty-tip">暂无片单备选</div>';
-  var types = (CFG.movieTypes||[]).map(function(t){return '<option value="'+t.id+'">'+t.icon+' '+t.label+'</option>';}).join("");
-  // 昨日记录：展示前一天已观看的影片（仅确有数据时）
-  var ydm=yesterdayDate(d), yMovies=getMoviesWatched().filter(function(m){return m.date===todayKey(ydm);});
-  var yestHtmlMovie=yMovies.length?'<div class="sub-block-hd" style="margin-top:16px;">📅 昨日观影（'+todayKey(ydm)+'）</div><div class="yest-box">'+yMovies.map(function(m){return '<div class="yest-item">🎬 '+esc(m.title)+(m.rating?(' · ⭐ '+m.rating):'')+'</div>';}).join("")+'</div>':'';
-  wrap.innerHTML =
+  var types = (CFG.movieTypes||[]);
+  var subTabs = types.map(function(t){
+    return '<button class="tab'+(movieSub===t.id?' active':'')+'" data-msub="'+t.id+'">'+t.icon+' '+t.label+'</button>';
+  }).join("") + '<button class="tab'+(movieSub==='reco'?' active':'')+'" data-msub="reco">💡 推荐</button>';
+
+  var head =
     '<h2 class="panel-title">🎬 影视存档本</h2>'+
     '<div class="panel-sub">值得收藏的影视作品</div>'+
     '<div class="stat-row">'+
@@ -515,26 +502,100 @@ function renderMovies(){
       '<div class="stat-card c3"><div class="num">'+b.stats.month+'</div><div class="lbl">本月新增</div></div>'+
     '</div>'+
     '<div class="quote-card plan-section" style="margin-bottom:12px;">📊 最近7天小计：观影 <b>'+sum7movie()+'</b> 部</div>'+
+    '<div class="tabs" id="mvSubTabs">'+subTabs+'</div>';
+
+  // 推荐页
+  if(movieSub==='reco'){
+    var done = getMovieRecoDone();
+    var groups = (CT.movieReco||[]);
+    var totalN=0, totalDone=0;
+    var html = head + '<div class="sub-block-hd">💡 推荐片单（勾选表示已观看）</div>';
+    groups.forEach(function(g){
+      var items = g.items||[];
+      var gd = items.filter(function(it){return done[it.id];}).length;
+      totalN += items.length; totalDone += gd;
+      var list = items.length?items.map(function(it){
+        return '<div class="li reco-item'+(done[it.id]?' done':'')+'" data-rid="'+it.id+'">'+
+          '<input type="checkbox" class="reco-cb" data-rid="'+it.id+'"'+(done[it.id]?' checked':'')+'>'+
+          '<div class="li-body"><div>'+esc(it.title)+' <span class="vtag bilibili" style="background:#a48cff">'+movieTypeLabel(it.type)+'</span> '+(it.rating?'⭐ '+it.rating:'')+'</div>'+
+          '<div class="li-meta">'+(it.year?it.year+' · ':'')+esc(it.note||'')+'</div></div></div>';
+      }).join("") : '<div class="empty-tip">暂无</div>';
+      html += '<div class="reco-group"><div class="sub-block-hd">'+g.icon+' '+g.title+' <span class="reco-prog">'+gd+'/'+items.length+'</span></div><div class="reco-list">'+list+'</div></div>';
+    });
+    html += '<div class="quote-card plan-section" style="margin-top:12px;">📌 已看推荐 <b>'+totalDone+'</b> / '+totalN+' 部</div>';
+    wrap.innerHTML = html;
+    bindMovies();
+    return;
+  }
+
+  // 分类页（综艺 / 电影 / 电视剧 / 动漫）
+  var t = types.find(function(x){return x.id===movieSub;}) || types[0];
+  var list = b.watched.filter(function(m){return m.type===movieSub;});
+  var itemsHtml = list.length?list.map(function(m){
+    return '<div class="li" data-mid="'+m.id+'">'+
+      '<span style="font-size:18px;">'+movieTypeIcon(m.type)+'</span>'+
+      '<div class="li-body"><div>'+esc(m.title)+' <span class="vtag bilibili" style="background:#a48cff">'+movieTypeLabel(m.type)+'</span> '+(m.rating?'⭐ '+m.rating:'')+'</div>'+
+      '<div class="li-meta">'+esc(m.date||"")+(m.note?' · '+esc(m.note):'')+'</div></div>'+
+      '<div class="li-actions"><button class="btn-edit" data-med="'+m.id+'">编辑</button><button class="btn-del" data-mdd="'+m.id+'">删</button></div></div>';
+  }).join("") : '<div class="empty-tip">还没有已观看的'+t.label+'</div>';
+  var wantList = b.want.filter(function(m){return m.type===movieSub;});
+  var wantHtml = wantList.length?wantList.map(function(m){
+    return '<div class="li" data-mwid="'+m.id+'">'+
+      '<span style="font-size:18px;">'+movieTypeIcon(m.type)+'</span>'+
+      '<div class="li-body"><div>'+esc(m.title)+' <span class="vtag bilibili" style="background:#a48cff">'+movieTypeLabel(m.type)+'</span></div>'+
+      '<div class="li-meta">'+esc(m.note||"")+'</div></div>'+
+      '<div class="li-actions"><button class="btn-edit" data-mwok="'+m.id+'">已看</button><button class="btn-del" data-mwdd="'+m.id+'">删</button></div></div>';
+  }).join("") : '<div class="empty-tip">暂无'+t.label+'片单备选</div>';
+  var ydm=yesterdayDate(d), yMovies=getMoviesWatched().filter(function(m){return m.date===todayKey(ydm);});
+  var yestHtmlMovie=yMovies.length?'<div class="sub-block-hd" style="margin-top:16px;">📅 昨日观影（'+todayKey(ydm)+'）</div><div class="yest-box">'+yMovies.map(function(m){return '<div class="yest-item">🎬 '+esc(m.title)+(m.rating?(' · ⭐ '+m.rating):'')+'</div>';}).join("")+'</div>':'';
+  wrap.innerHTML = head +
+    '<div class="quote-card plan-section" style="margin-bottom:10px;">📂 当前板块：'+t.icon+' '+t.label+'（类型已锁定）</div>'+
     '<div class="form-row">'+
-      '<select id="mvType" class="inp-cat">'+types+'</select>'+
-      '<input id="mvTitle" class="inp-text" placeholder="影片名称" maxlength="60">'+
+      '<input type="hidden" id="mvType" value="'+movieSub+'">'+
+      '<input id="mvTitle" class="inp-text" placeholder="'+t.label+'名称" maxlength="60">'+
       '<input id="mvRating" class="inp-amt" placeholder="评分1-10" type="number" min="0" max="10" step="0.5">'+
       '<button class="btn-primary" id="mvAddWatched">+ 添加已看</button>'+
     '</div>'+
     '<div class="form-row">'+
-      '<select id="mvTypeW" class="inp-cat">'+types+'</select>'+
-      '<input id="mvTitleW" class="inp-text" placeholder="备选影片名称" maxlength="60">'+
+      '<input type="hidden" id="mvTypeW" value="'+movieSub+'">'+
+      '<input id="mvTitleW" class="inp-text" placeholder="备选'+t.label+'名称" maxlength="60">'+
       '<button class="btn-primary" id="mvAddWant">+ 加入片单</button>'+
     '</div>'+
-    '<div class="tabs" id="mvTabs">'+tabs+'</div>'+
-    '<div class="sub-block-hd">🎬 已观看影片</div><div id="mvList">'+itemsHtml+'</div>'+
-    '<div class="sub-block-hd" style="margin-top:12px;">📝 片单备选清单</div><div id="mvWantList">'+wantHtml+'</div>'+
+    '<div class="sub-block-hd">🎬 已观看'+t.label+'</div><div id="mvList">'+itemsHtml+'</div>'+
+    '<div class="sub-block-hd" style="margin-top:12px;">📝 '+t.label+'片单备选</div><div id="mvWantList">'+wantHtml+'</div>'+
     yestHtmlMovie;
   bindMovies();
 }
 
 function bindMovies(){
-  // 添加已看
+  // 子页切换
+  document.querySelectorAll("#mvSubTabs .tab").forEach(function(b){
+    b.onclick=function(){movieSub=b.getAttribute("data-msub");renderMovies();};
+  });
+  // 推荐勾选（已看）
+  document.querySelectorAll("#m-movie .reco-cb").forEach(function(cb){
+    cb.onchange=function(){
+      var rid=cb.getAttribute("data-rid");
+      var done=getMovieRecoDone();
+      var groups=(CT.movieReco||[]), item=null, gTitle="";
+      groups.forEach(function(g){ (g.items||[]).forEach(function(it){ if(it.id===rid){item=it;gTitle=g.title;} }); });
+      if(!item) return;
+      if(cb.checked){
+        done[rid]=1;
+        var arr=getMoviesWatched();
+        if(!arr.some(function(m){return m.recoId===rid;})){
+          arr.unshift({id:uid(), title:item.title, type:item.type, rating:item.rating||"", date:todayKey(new Date()), note:"推荐："+gTitle, recoId:rid});
+          setMoviesWatched(arr);
+        }
+      } else {
+        delete done[rid];
+        setMoviesWatched(getMoviesWatched().filter(function(m){return m.recoId!==rid;}));
+      }
+      setMovieRecoDone(done);
+      renderMovies();
+    };
+  });
+  // 仅分类页存在以下按钮
   var a1=document.getElementById("mvAddWatched");
   if(a1) a1.onclick=function(){
     var t=document.getElementById("mvTitle").value.trim();
@@ -543,7 +604,6 @@ function bindMovies(){
     arr.unshift({id:uid(), title:t, type:document.getElementById("mvType").value, rating:document.getElementById("mvRating").value||"", date:todayKey(new Date())});
     setMoviesWatched(arr);renderMovies();
   };
-  // 加入片单
   var a2=document.getElementById("mvAddWant");
   if(a2) a2.onclick=function(){
     var t=document.getElementById("mvTitleW").value.trim();
@@ -552,10 +612,6 @@ function bindMovies(){
     arr.unshift({id:uid(), title:t, type:document.getElementById("mvTypeW").value, note:""});
     setMoviesWant(arr);renderMovies();
   };
-  // 筛选 tab
-  document.querySelectorAll("#mvTabs .tab").forEach(function(b){
-    b.onclick=function(){movieFilter=b.getAttribute("data-mf");renderMovies();};
-  });
   // 删除已看
   document.querySelectorAll("#m-movie .btn-del[data-mdd]").forEach(function(b){
     b.onclick=function(){
@@ -572,7 +628,7 @@ function bindMovies(){
       renderMovies();
     };
   });
-  // 编辑已看（弹窗简化：prompt 评分/备注）
+  // 编辑已看
   document.querySelectorAll("#m-movie .btn-edit[data-med]").forEach(function(b){
     b.onclick=function(){
       var id=b.getAttribute("data-med");
@@ -596,7 +652,8 @@ function bindMovies(){
       renderMovies();
     };
   });
-}/* app.js part 5 — 运动锻炼(目标盒 + 日历打卡 widget + 视频跳转 + 记录列表) */
+}
+
 var exCalMonth = null; // 当前显示月份 {y,m}
 
 function buildExercise(d){

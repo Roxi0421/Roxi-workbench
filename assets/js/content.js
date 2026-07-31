@@ -12,6 +12,40 @@
 
 window.WB_CONTENT = {
 
+  /* ---------------- 观影推荐片单 ---------------- */
+  /* 每个分组 item: { id, title, type(variety/movie/tv/anime), year, rating(满分10), note } */
+  movieReco: [
+    { id: "watch", title: "推荐观看影片", icon: "🎯", items: [
+      { id: "w1", title: "瞬息全宇宙", type: "movie", year: 2022, rating: 8.6, note: "多元宇宙寓言·华裔移民家庭" },
+      { id: "w2", title: "健听女孩", type: "movie", year: 2021, rating: 8.6, note: "听障家庭的少女追梦" },
+      { id: "w3", title: "我的天才女友", type: "tv", year: 2018, rating: 9.0, note: "女性友谊与成长（那不勒斯四部曲）" },
+      { id: "w4", title: "葬送的芙莉莲", type: "anime", year: 2023, rating: 9.3, note: "旅途与「人」的意义" },
+      { id: "w5", title: "种地吧", type: "variety", year: 2023, rating: 9.0, note: "十位少年的真实劳作纪实" }
+    ]},
+    { id: "high", title: "推荐高分", icon: "⭐", items: [
+      { id: "h1", title: "肖申克的救赎", type: "movie", year: 1994, rating: 9.7, note: "希望与自由" },
+      { id: "h2", title: "千与千寻", type: "movie", year: 2001, rating: 9.4, note: "宫崎骏·成长与勇气" },
+      { id: "h3", title: "绝命毒师", type: "tv", year: 2008, rating: 9.5, note: "化学老师的灰色人生" },
+      { id: "h4", title: "进击的巨人", type: "anime", year: 2013, rating: 9.6, note: "自由与战争的史诗" },
+      { id: "h5", title: "机智的医生生活", type: "variety", year: 2020, rating: 9.5, note: "五位医生的温情日常" }
+    ]},
+    { id: "classic", title: "经典", icon: "🏆", items: [
+      { id: "c1", title: "罗马假日", type: "movie", year: 1953, rating: 9.0, note: "奥黛丽·赫本·罗马邂逅" },
+      { id: "c2", title: "乱世佳人", type: "movie", year: 1939, rating: 9.3, note: "战火中的爱情与倔强" },
+      { id: "c3", title: "老友记", type: "tv", year: 1994, rating: 9.7, note: "六人的纽约喜剧时光" },
+      { id: "c4", title: "龙珠", type: "anime", year: 1986, rating: 9.0, note: "热血冒险的启蒙之作" },
+      { id: "c5", title: "超级变变变", type: "variety", year: 1979, rating: 9.0, note: "日本长青创意综艺" }
+    ]},
+    { id: "feminism", title: "平权主义", icon: "♀️", items: [
+      { id: "f1", title: "末路狂花", type: "movie", year: 1991, rating: 8.8, note: "女性觉醒与反抗" },
+      { id: "f2", title: "隐藏人物", type: "movie", year: 2016, rating: 8.9, note: "三位黑人女性航天工程师" },
+      { id: "f3", title: "燃烧女子的肖像", type: "movie", year: 2019, rating: 8.7, note: "女性凝视与自由之爱" },
+      { id: "f4", title: "妇女参政论者", type: "movie", year: 2015, rating: 8.5, note: "英国妇女选举权运动" },
+      { id: "f5", title: "了不起的麦瑟尔夫人", type: "tv", year: 2017, rating: 8.7, note: "50年代女性的独立觉醒" },
+      { id: "f6", title: "乘风破浪的姐姐", type: "variety", year: 2020, rating: 7.2, note: "30+女性的舞台竞演" }
+    ]}
+  ],
+
   /* ---------------- 运动视频库 ---------------- */
   VIDEOS: [
     // 高强度 · 瘦腿塑形 + 全身燃脂（国际 trainer，跳转 B站）

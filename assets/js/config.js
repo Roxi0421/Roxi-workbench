@@ -224,10 +224,10 @@ window.WB_CONFIG = {
     { id: "other",   label: "其他",   icon: "✨" }
   ],
   movieTypes: [
-    { id: "movie",  label: "电影",   icon: "🎬" },
-    { id: "drama",  label: "剧集",   icon: "📺" },
-    { id: "doc",    label: "纪录片", icon: "🎥" },
-    { id: "anime",  label: "动漫",   icon: "🌸" }
+    { id: "variety", label: "综艺",   icon: "🎤" },
+    { id: "movie",   label: "电影",   icon: "🎬" },
+    { id: "tv",      label: "电视剧", icon: "📺" },
+    { id: "anime",   label: "动漫",   icon: "🌸" }
   ],
   defaultSavings: [
     { id: "s1", name: "应急基金", target: 10000, saved: 0, deadline: "2026-12-31" },
