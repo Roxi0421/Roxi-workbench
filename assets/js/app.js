@@ -404,10 +404,19 @@ function getMonthBooks(d){
   return books;
 }
 
-function buildReading(d){
-  var books = getMonthBooks(d);
+var readSub = "web"; // 读书子页：web(网络文学) / physical(实体书籍) / reco(推荐)
+
+function getReadUserBooks(){return lsJSON("wb_read_user_books",[]);}
+function setReadUserBooks(a){lsSetJSON("wb_read_user_books",a);}
+function getReadBookDone(){return lsJSON("wb_read_book_done",{});}
+function setReadBookDone(o){lsSetJSON("wb_read_book_done",o);}
+
+function buildReading(d, type){
+  var books = (CFG.reading.books||[]).slice();
+  if(type) books = books.filter(function(b){return b.type===type;});
+  if(CFG.reading.firstBook) books.sort(function(a,b){return (a.title===CFG.reading.firstBook?-1:b.title===CFG.reading.firstBook?1:0);});
   var flat = [];
-  books.forEach(function(b){ b.chapters.forEach(function(c){ flat.push({book:b, ch:c}); }); });
+  books.forEach(function(b){ (b.chapters||[]).forEach(function(c){ flat.push({book:b, ch:c}); }); });
   var total = flat.length;
   var done = getReadDone();
   var keyOf = function(it){ return it.book.title+"#"+it.ch.n; };
@@ -419,50 +428,149 @@ function buildReading(d){
 
 function renderReading(){
   var d = new Date();
-  var rd = buildReading(d);
   var wrap = document.getElementById("m-reading");
+  var subTabs =
+    '<button class="tab'+(readSub==='web'?' active':'')+'" data-rsub="web">📱 网络文学</button>'+
+    '<button class="tab'+(readSub==='physical'?' active':'')+'" data-rsub="physical">📚 实体书籍</button>'+
+    '<button class="tab'+(readSub==='reco'?' active':'')+'" data-rsub="reco">💡 推荐</button>';
+  var head =
+    '<h2 class="panel-title">📖 读书记录</h2>'+
+    '<div class="panel-sub">读了就勾选，没读就不勾选 · '+CFG.reminders.reading+' 提醒 <button type="button" class="btn-ghost" id="rdRemindBtn">开启桌面提醒</button></div>'+
+    '<div class="tabs" id="rdSubTabs">'+subTabs+'</div>';
+
+  // 推荐页（书级「已读」勾选）
+  if(readSub==='reco'){
+    var bdone = getReadBookDone();
+    var groups = (CT.readReco||[]);
+    var totalN=0, totalDone=0;
+    var html = head + '<div class="sub-block-hd">💡 推荐书单（勾选表示已读）</div>';
+    groups.forEach(function(g){
+      var items = g.items||[];
+      var gd = items.filter(function(it){return bdone[it.id];}).length;
+      totalN += items.length; totalDone += gd;
+      var list = items.length?items.map(function(it){
+        return '<div class="li reco-item'+(bdone[it.id]?' done':'')+'">'+
+          '<input type="checkbox" class="rb-cb" data-rid="'+it.id+'"'+(bdone[it.id]?' checked':'')+'>'+
+          '<div class="li-body"><div>《'+esc(it.title)+'》'+(it.author?' <span class="vtag bilibili" style="background:#a48cff">'+esc(it.author)+'</span>':'')+'</div>'+
+          '<div class="li-meta">'+(it.note?esc(it.note):'')+'</div></div></div>';
+      }).join("") : '<div class="empty-tip">暂无</div>';
+      html += '<div class="reco-group"><div class="sub-block-hd">'+g.icon+' '+g.title+' <span class="reco-prog">'+gd+'/'+items.length+'</span></div><div class="reco-list">'+list+'</div></div>';
+    });
+    html += '<div class="quote-card plan-section" style="margin-top:12px;">📌 已读推荐 <b>'+totalDone+'</b> / '+totalN+' 本</div>';
+    wrap.innerHTML = html;
+    bindReading();
+    return;
+  }
+
+  // 分类页（网络文学 / 实体书籍）
+  var typeName = readSub==='web'?'网络文学':'实体书籍';
+  var rd = buildReading(d, readSub);
   var pct = rd.total?Math.round(rd.done/rd.total*100):0;
   function chapItem(it){
     return '<div class="chapter'+(it.isDone?' done':'')+'" data-readk="'+it.gi+'">'+
       '<label class="rcheck"><input type="checkbox" data-read="'+it.gi+'" data-total="'+rd.total+'" '+(it.isDone?'checked':'')+'></label>'+
       '<div class="rc-body">'+
       '<div class="rc-t">《'+esc(it.book.title)+'》第 '+it.ch.n+' 章 · '+esc(it.ch.title)+'</div>'+
-      '<div class="rc-sum">'+esc(it.ch.summary||"")+'</div>'+
-      '<div class="rc-thought">❓ 思考：'+esc(it.ch.thought||"")+'</div>'+
+      '<div class="rc-sum">'+esc(it.ch.summary||'')+'</div>'+
+      '<div class="rc-thought">❓ 思考：'+esc(it.ch.thought||'')+'</div>'+
       '</div></div>';
   }
-  var unreadHtml = rd.unread.length ? rd.unread.map(chapItem).join("") : '<div class="rest">全部章节都读完啦，享受回味 🌟</div>';
+  var unreadHtml = rd.unread.length ? rd.unread.map(chapItem).join("") : '<div class="rest">本类章节都读完啦，享受回味 🌟</div>';
   var readHtml = rd.read.length ? '<div class="sub-block-hd" style="margin-top:14px;">✅ 已读章节（'+rd.read.length+' 章 · 可取消勾选）</div>'+rd.read.map(chapItem).join("") : '';
-  // 昨日阅读：按阅读日志里日期=昨天的条目统计（仅确有数据时展示）
+  // 我的书架（用户添加，整本勾选）
+  var userBooks = getReadUserBooks().filter(function(b){return b.type===readSub;});
+  var bdone2 = getReadBookDone();
+  var shelfHtml = userBooks.length ? userBooks.map(function(b){
+    var dn = bdone2[b.id];
+    return '<div class="li reco-item'+(dn?' done':'')+'">'+
+      '<input type="checkbox" class="ub-cb" data-ubid="'+b.id+'"'+(dn?' checked':'')+'>'+
+      '<div class="li-body"><div>《'+esc(b.title)+'》'+(b.author?' <span class="vtag bilibili" style="background:#a48cff">'+esc(b.author)+'</span>':'')+'</div>'+
+      '<div class="li-meta">我的书架</div></div>'+
+      '<div class="li-actions"><button class="btn-del" data-ubdel="'+b.id+'">删</button></div></div>';
+  }).join("") : '<div class="empty-tip">书架还空，添加一本吧～</div>';
+  // 昨日阅读（全类型，与「昨日记录」整体一致）
   var yd2=yesterdayDate(d), ykey2=todayKey(yd2);
   var yReads=getReadLog().filter(function(e){return e.date===ykey2;});
   var yestHtmlRead="";
   if(yReads.length){
-    var ydet=yReads.map(function(e){var r=resolveReadKey(e.key);return r?('《'+esc(r.book)+'》'+r.chapter):"";}).filter(Boolean);
+    var ydet=yReads.map(function(e){var r=resolveReadKey(e.key);return r?('《'+esc(r.book)+'》'+r.chapter):'';}).filter(Boolean);
     yestHtmlRead='<div class="sub-block-hd" style="margin-top:16px;">📅 昨日阅读（'+ykey2+'）</div><div class="yest-box"><div class="yest-item">📖 阅读 '+yReads.length+' 章'+(ydet.length?('：'+ydet.join('、')):'')+'</div></div>';
   }
-  wrap.innerHTML =
-    '<h2 class="panel-title">📖 读书记录</h2>'+
-    '<div class="panel-sub">本月书单 · 读了就勾选，没读就不勾选 · '+CFG.reminders.reading+' 提醒 <button type="button" class="btn-ghost" id="rdRemindBtn">开启桌面提醒</button></div>'+
-    '<div class="sub-block-hd">📚 本月书单：'+rd.books.map(function(b){return '《'+esc(b.title)+'》';}).join("、")+'</div>'+
+  wrap.innerHTML = head +
+    '<div class="sub-block-hd">📚 '+typeName+'书单：'+rd.books.map(function(b){return '《'+esc(b.title)+'》';}).join("、")+'</div>'+
     '<div class="quote-card plan-section" style="margin-bottom:12px;">📊 最近7天小计：阅读 <b>'+sum7read()+'</b> 章</div>'+
     '<div class="sub-block-hd">📌 后续章节（待读 '+rd.unread.length+' 章）</div>'+
     unreadHtml+
     readHtml+
     '<div class="goal"><div class="bar"><div class="bar-fill" style="width:'+pct+'%"></div></div>'+
     '<div class="goal-sub">已完成 '+rd.done+' / '+rd.total+' 章 · '+pct+'%</div></div>'+
+    '<div class="sub-block-hd" style="margin-top:16px;">📝 我的书架（整本勾选）</div>'+
+    '<div class="form-row">'+
+      '<input type="hidden" id="ubType" value="'+readSub+'">'+
+      '<input id="ubTitle" class="inp-text" placeholder="书名" maxlength="60">'+
+      '<input id="ubAuthor" class="inp-text" placeholder="作者（可选）" maxlength="40">'+
+      '<button class="btn-primary" id="ubAdd">+ 加入书架</button>'+
+    '</div>'+
+    '<div id="ubList">'+shelfHtml+'</div>'+
     yestHtmlRead;
-  // 绑定章节勾选 + 提醒按钮
+  bindReading();
+}
+
+function bindReading(){
+  // 子页切换
+  document.querySelectorAll("#rdSubTabs .tab").forEach(function(b){
+    b.onclick=function(){readSub=b.getAttribute("data-rsub");renderReading();};
+  });
+  // 章节勾选（写入完成集合 + 阅读日志）
   document.querySelectorAll('#m-reading input[data-read]').forEach(function(cb){
     cb.onchange = function(){
       var gi = cb.getAttribute('data-read');
-      setReadDone(gi, cb.checked);   // 写入完成集合 + 阅读日志（按天计入历史）
-      renderReading();              // 刷新：后续章节 + 进度 + 昨日阅读（实时更新）
-      renderHistory();              // 同步历史记录面板
+      setReadDone(gi, cb.checked);
+      renderReading();
+      renderHistory();
     };
   });
+  // 推荐勾选（已读）
+  document.querySelectorAll('#m-reading .rb-cb').forEach(function(cb){
+    cb.onchange = function(){
+      var rid=cb.getAttribute('data-rid');
+      var o=getReadBookDone();
+      if(cb.checked) o[rid]=1; else delete o[rid];
+      setReadBookDone(o);
+      renderReading();
+    };
+  });
+  // 我的书架勾选
+  document.querySelectorAll('#m-reading .ub-cb').forEach(function(cb){
+    cb.onchange = function(){
+      var id=cb.getAttribute('data-ubid');
+      var o=getReadBookDone();
+      if(cb.checked) o[id]=1; else delete o[id];
+      setReadBookDone(o);
+      renderReading();
+    };
+  });
+  // 加入书架
+  var ua=document.getElementById("ubAdd");
+  if(ua) ua.onclick=function(){
+    var t=document.getElementById("ubTitle").value.trim();
+    if(!t){alert("请输入书名");return;}
+    var arr=getReadUserBooks();
+    arr.unshift({id:uid(), title:t, author:document.getElementById("ubAuthor").value.trim(), type:document.getElementById("ubType").value});
+    setReadUserBooks(arr);renderReading();
+  };
+  // 删除书架
+  document.querySelectorAll('#m-reading .btn-del[data-ubdel]').forEach(function(b){
+    b.onclick=function(){
+      var id=b.getAttribute('data-ubdel');
+      setReadUserBooks(getReadUserBooks().filter(function(x){return x.id!==id;}));
+      renderReading();
+    };
+  });
+  // 提醒按钮
   var rb = document.getElementById('rdRemindBtn'); if(rb) rb.onclick = requestRemindPerm;
-}/* app.js part 4 — 观影记录(完整版：统计卡 + 筛选 + 已看/想看 双列表 + 增删改) */
+}
+/* app.js part 4 — 观影记录(完整版：统计卡 + 筛选 + 已看/想看 双列表 + 增删改) */
 var movieSub = "variety"; // 观影子页：variety / movie / tv / anime / reco
 
 function buildMovies(){

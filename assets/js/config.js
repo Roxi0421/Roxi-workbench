@@ -125,6 +125,7 @@ window.WB_CONFIG = {
     books: [
       {
         title: "克林索尔的最后一个夏天",
+        type: "physical",
         author: "赫尔曼·黑塞",
         totalChapters: 12,
         totalPages: 180,
@@ -146,6 +147,7 @@ window.WB_CONFIG = {
       },
       {
         title: "她对此感到厌烦",
+        type: "web",
         author: "易小荷",
         totalChapters: 47,
         totalPages: 392,

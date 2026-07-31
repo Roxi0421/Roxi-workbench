@@ -46,6 +46,34 @@ window.WB_CONTENT = {
     ]}
   ],
 
+  /* ---------------- 读书推荐书单 ---------------- */
+  /* 作者均无辱女倾向；分组：川端康成风·治愈 / 经典传统文学 / 高分女频网文 */
+  /* 每个 item: { id, title, author, note } */
+  readReco: [
+    { id: "heal", title: "川端康成风 · 治愈", icon: "🌸", items: [
+      { id: "hl1", title: "雪国", author: "川端康成", note: "徒劳与美的极致，清冷而治愈" },
+      { id: "hl2", title: "古都", author: "川端康成", note: "孪生姐妹与京都四季物语" },
+      { id: "hl3", title: "厨房", author: "吉本芭娜娜", note: "孤独与温柔交织的治愈物语" },
+      { id: "hl4", title: "山茶文具店", author: "小川糸", note: "代笔人间的温度与四季流转" },
+      { id: "hl5", title: "一个人的好天气", author: "青山七惠", note: "都市独居少女的淡淡诗意" }
+    ]},
+    { id: "classic", title: "经典传统文学", icon: "📜", items: [
+      { id: "cl1", title: "红楼梦", author: "曹雪芹", note: "世情小说巅峰，女儿们的悲欢" },
+      { id: "cl2", title: "边城", author: "沈从文", note: "湘西水乡的纯净与哀愁" },
+      { id: "cl3", title: "源氏物语", author: "紫式部", note: "千年和风物语，女性书写经典" },
+      { id: "cl4", title: "围城", author: "钱锺书", note: "婚姻如围城的幽默哲思" },
+      { id: "cl5", title: "百年孤独", author: "马尔克斯", note: "魔幻现实的家族史诗" }
+    ]},
+    { id: "female", title: "高分女频网文", icon: "🌟", items: [
+      { id: "fm1", title: "她对此感到厌烦", author: "易小荷", note: "女性觉醒 · 反套路爽文" },
+      { id: "fm2", title: "有匪", author: "priest", note: "江湖儿女 · 女主坚韧成长" },
+      { id: "fm3", title: "默读", author: "priest", note: "刑侦悬疑 · 温柔治愈向" },
+      { id: "fm4", title: "知否知否应是绿肥红瘦", author: "关心则乱", note: "宅斗成长 · 古言经典" },
+      { id: "fm5", title: "扶摇皇后", author: "天下归元", note: "女强逆袭 · 大气磅礴" },
+      { id: "fm6", title: "沥川往事", author: "玄隐", note: "温柔克制的都市爱情" }
+    ]}
+  ],
+
   /* ---------------- 运动视频库 ---------------- */
   VIDEOS: [
     // 高强度 · 瘦腿塑形 + 全身燃脂（国际 trainer，跳转 B站）
