@@ -17,6 +17,7 @@ function el(tag,attrs,html){var e=document.createElement(tag);if(attrs)for(var k
 function isWorkday(d){d=d||new Date();var k=todayKey(d);if((CFG.workdays||[]).indexOf(k)>=0)return true;if((CFG.holidays||[]).indexOf(k)>=0)return false;var w=d.getDay();return w>=1&&w<=5;}
 function fmtDate(d){return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日";}
 function shortDate(d){return (d.getMonth()+1)+"/"+d.getDate();}
+function fmtH(h){var hh=Math.floor(h);var mm=Math.round((h-hh)*60);return hh+"小时"+(mm?mm+"分":"");}
 function startOfDay(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
 function uid(){return "id"+Date.now()+""+Math.floor(Math.random()*1e6);}
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
@@ -31,6 +32,9 @@ function lsSetJSON(k,v){lsSet(k,JSON.stringify(v));}
 function healthKey(d){return "wb_health_"+todayKey(d);}
 function getHealth(d){var k=healthKey(d);var v=lsJSON(k,null);if(v)return v;var cur=new Date();for(var i=1;i<=14;i++){var dd=new Date(cur.getFullYear(),cur.getMonth(),cur.getDate()-i);var v2=lsJSON(healthKey(dd),null);if(v2){v2._carried=true;v2._daysAgo=i;return v2;}}return {sleepHours:6.5,fatigue:2,sleepQuality:4,thighCm:CFG.goals.currentThighCm||58,_carried:true,_daysAgo:0};}
 function setHealth(d,o){lsSetJSON(healthKey(d),o);}
+function sleepSelfKey(d){return "wb_sleep_self_"+todayKey(d);}
+function getSleepSelf(d){return lsJSON(sleepSelfKey(d),null);}
+function setSleepSelf(d,o){lsSetJSON(sleepSelfKey(d),o);}
 
 /* 任务(每日工作内容) */
 function worktaskKey(d){return "wb_worktasks_"+todayKey(d);}
@@ -1112,29 +1116,116 @@ function sum7exercise(){
 }
 
 /* app.js part 7 — 旧模块移植：睡眠 / 护肤 / 三电英语 / 今日便签 */
-function buildSleep(d){
-  var p = CFG.profile, s = CFG.sleep, g = CFG.goals;
-  var health = getHealth(d);
-  var now = d.getHours()*60+d.getMinutes();
+function buildSleep(d, q){
+  var p = CFG.profile, s = CFG.sleep;
   var bedtime = parseTime(s.defaultBedtime);
+  if(q!=null && q<60) bedtime = parseTime(s.highFatigueBedtime);
   var wake = parseTime(p.wakeTime);
-  if(health.fatigue>=4) bedtime = parseTime(s.highFatigueBedtime);
+  var now = d.getHours()*60+d.getMinutes();
   var sleepMins = wake>now ? wake-now+1440 : wake-now;
   sleepMins = sleepMins - s.windDownMinutes - s.sleepCycleMinutes;
   var cycles = Math.max(0, Math.floor(sleepMins/s.sleepCycleMinutes));
-  return {bedtime:fmtTime(bedtime), wake:fmtTime(wake), cycles:cycles, quality:health.sleepQuality, fatigue:health.fatigue, wind:s.windDownMinutes};
+  return {bedtime:fmtTime(bedtime), wake:fmtTime(wake), cycles:cycles, wind:s.windDownMinutes};
+}
+/* 根据填入的 4 项数值，给出今日状态评分(0-100)与分项休息建议 */
+function evalSleep(v){
+  var dur = v.duration!=null?v.duration:7.5;
+  var q = v.quality!=null?v.quality:75;
+  var rhr = v.rhr!=null?v.rhr:70;
+  var spo2 = v.spo2!=null?v.spo2:97;
+  function durScore(d){ if(d>=7&&d<=9) return 100; if((d>=6&&d<7)||(d>9&&d<=10)) return 82; if((d>=5&&d<6)||(d>10&&d<=11)) return 60; return 35; }
+  function rhrScore(r){ if(r<=60) return 100; if(r<=70) return 90; if(r<=80) return 75; if(r<=90) return 55; return 30; }
+  function spo2Score(s){ if(s>=98) return 100; if(s>=96) return 85; if(s>=94) return 65; if(s>=92) return 45; return 20; }
+  var sd=durScore(dur), sr=rhrScore(rhr), ss=spo2Score(spo2);
+  var score=Math.round(q*0.35 + sd*0.25 + sr*0.20 + ss*0.20);
+  var label, emoji;
+  if(score>=85){label="优秀";emoji="🌟";}
+  else if(score>=70){label="良好";emoji="🙂";}
+  else if(score>=55){label="一般";emoji="😐";}
+  else if(score>=40){label="偏差";emoji="😟";}
+  else {label="需关注";emoji="⚠️";}
+  var advice=[];
+  if(dur<7) advice.push('⏱️ 睡眠时长偏短（'+fmtH(dur)+'），今晚尽量提前约 '+Math.max(10,Math.round((7-dur)*60))+' 分钟入睡，补足 7–8 小时。');
+  else if(dur>9.5) advice.push('⏱️ 睡眠偏长（'+fmtH(dur)+'），留意是否夜间易醒，白天适度活动、避免久卧。');
+  else advice.push('⏱️ 睡眠时长达标（'+fmtH(dur)+'），保持规律作息。');
+  if(q<60) advice.push('🌙 睡眠质量偏低（'+q+'/100），睡前 1 小时远离屏幕、调暗灯光，做 5 分钟腹式呼吸放松。');
+  else if(q<80) advice.push('🌙 睡眠质量中等（'+q+'/100），固定起床时间有助于提升深睡比例。');
+  else advice.push('🌙 睡眠质量不错（'+q+'/100），继续维持。');
+  if(rhr>80) advice.push('❤️ 静息心率偏高（'+rhr+' bpm），可能与压力 / 咖啡因有关，今天少喝咖啡、做 10 分钟有氧。');
+  else if(rhr<=60) advice.push('❤️ 静息心率很棒（'+rhr+' bpm），心肺状态良好。');
+  else advice.push('❤️ 静息心率正常（'+rhr+' bpm）。');
+  if(spo2<94) advice.push('🩸 平均血氧偏低（'+spo2+'%），建议侧卧、保持卧室通风；若持续低于 92% 请就医排查。');
+  else if(spo2<96) advice.push('🩸 血氧略低（'+spo2+'%），留意睡姿与通风。');
+  else advice.push('🩸 血氧正常（'+spo2+'%）。');
+  return {score:score, label:label, emoji:emoji, advice:advice};
 }
 function renderSleep(){
   var d = new Date();
-  var b = buildSleep(d);
+  var self = getSleepSelf(d);
+  var def = {duration:7.5, quality:75, rhr:70, spo2:97};
+  var v = {
+    duration: self&&self.duration!=null?self.duration:def.duration,
+    quality: self&&self.quality!=null?self.quality:def.quality,
+    rhr:     self&&self.rhr!=null?self.rhr:def.rhr,
+    spo2:    self&&self.spo2!=null?self.spo2:def.spo2
+  };
+  var b = buildSleep(d, v.quality);
+  // 昨日自评（若有）
+  var yd = yesterdayDate(d), ySelf = getSleepSelf(yd);
+  var yestHtmlSleep = "";
+  if(ySelf){
+    var ye = evalSleep(ySelf);
+    yestHtmlSleep = '<div class="sub-block-hd" style="margin-top:14px;">📅 昨日睡眠（'+todayKey(yd)+'）</div><div class="yest-box"><div class="yest-item">😴 评分 '+ye.score+' · '+ye.emoji+' '+ye.label+'（时长 '+fmtH(ySelf.duration)+' · 质量 '+ySelf.quality+' · 心率 '+ySelf.rhr+' · 血氧 '+ySelf.spo2+'%）</div></div>';
+  }
+  var fields = [
+    {k:"duration", label:"睡眠时长", unit:"小时", step:"0.5", min:"0", max:"24", val:v.duration},
+    {k:"quality",  label:"睡眠质量", unit:"(0-100)", step:"1", min:"0", max:"100", val:v.quality},
+    {k:"rhr",      label:"静息心率", unit:"bpm", step:"1", min:"0", max:"200", val:v.rhr},
+    {k:"spo2",     label:"平均血氧", unit:"%", step:"1", min:"0", max:"100", val:v.spo2}
+  ];
+  var formHtml = fields.map(function(f){
+    return '<div class="sleep-field"><label>'+f.label+' <span class="sf-unit">'+f.unit+'</span></label>'+
+      '<input type="number" class="sf-inp" id="sf_'+f.k+'" data-sk="'+f.k+'" step="'+f.step+'" min="'+f.min+'" max="'+f.max+'" value="'+f.val+'"></div>';
+  }).join("");
   document.getElementById("m-sleep").innerHTML =
     '<h2 class="panel-title">🌙 睡眠管理</h2>'+
-    '<div class="panel-sub">反向计算最佳入睡时间</div>'+
+    '<div class="panel-sub">填入今日手环数据，自动评估状态与休息建议</div>'+
     '<div class="quote-card plan-section"><b>🎯 建议入睡：'+b.bedtime+'</b><br>'+
     '起床 '+b.wake+' · 需 '+b.wind+'min 缓冲 + '+b.cycles+' 个睡眠周期</div>'+
-    '<div class="sub-block-hd">💤 今日状态</div>'+
-    '<div class="quote-card">睡眠质量 '+b.quality+'/5 · 疲劳 '+b.fatigue+'/5</div>'+
-    '<div class="quote-card" style="margin-top:10px;"><b>睡前仪式</b><br>· 23:00 后远离手机<br>· 拉伸放松 5 分钟<br>· 听轻音乐入眠<br>· 早起时间：'+b.wake+'</div>';
+    '<div class="sub-block-hd">📝 今日睡眠数据（填入即评估）</div>'+
+    '<div class="sleep-form">'+formHtml+'</div>'+
+    '<div id="sleepAssess"></div>'+
+    '<div class="quote-card plan-section" style="margin-top:12px;"><b>🛏️ 睡前仪式</b><br>· 23:00 后远离手机<br>· 拉伸放松 5 分钟<br>· 听轻音乐入眠<br>· 早起时间：'+b.wake+'</div>'+
+    yestHtmlSleep;
+  bindSleep();
+}
+function bindSleep(){
+  var d = new Date();
+  function readVals(){
+    function num(id, def, min, max){ var el=document.getElementById(id); var x=parseFloat(el&&el.value); if(isNaN(x)) x=def; x=Math.max(min, Math.min(max, x)); return x; }
+    return {
+      duration: num("sf_duration", 7.5, 0, 24),
+      quality:  num("sf_quality", 75, 0, 100),
+      rhr:      num("sf_rhr", 70, 0, 200),
+      spo2:     num("sf_spo2", 97, 0, 100)
+    };
+  }
+  function paint(){
+    var v = readVals();
+    setSleepSelf(d, v);
+    var e = evalSleep(v);
+    var assess = document.getElementById("sleepAssess");
+    if(assess){
+      assess.innerHTML =
+        '<div class="sub-block-hd" style="margin-top:12px;">💡 今日状态评估</div>'+
+        '<div class="quote-card plan-section"><div class="sleep-score"><span class="ss-num">'+e.score+'</span><span class="ss-emoji">'+e.emoji+' '+e.label+'</span></div>'+
+        '<div class="sleep-advice">'+e.advice.map(function(a){return '<div class="sa-item">'+a+'</div>';}).join("")+'</div></div>';
+    }
+  }
+  document.querySelectorAll("#m-sleep .sf-inp").forEach(function(inp){
+    inp.addEventListener("input", paint);
+  });
+  paint();
 }
 
 /* ============ 护肤 ============ */

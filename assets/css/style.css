@@ -653,6 +653,19 @@ body.nav-dragging .nav-item { cursor: grabbing; }
 .record-card .rb { flex: 1 1 auto; }
 .record-card .rm { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
+/* ============== 睡眠自评表单 ============== */
+.sleep-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin: 8px 0 4px; }
+.sleep-field { display: flex; flex-direction: column; gap: 4px; }
+.sleep-field label { font-size: 12px; color: var(--ink); font-weight: 600; }
+.sleep-field .sf-unit { color: var(--muted); font-weight: 400; font-size: 11px; }
+.sleep-field .sf-inp { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; color: var(--ink); background: #fff; font-variant-numeric: tabular-nums; }
+.sleep-field .sf-inp:focus { outline: none; border-color: var(--brand); }
+.sleep-score { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.sleep-score .ss-num { font-size: 34px; font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; }
+.sleep-score .ss-emoji { font-size: 16px; color: var(--ink); }
+.sleep-advice { display: flex; flex-direction: column; gap: 6px; }
+.sleep-advice .sa-item { font-size: 13px; color: var(--ink); line-height: 1.5; }
+
 /* ============== 可收起抽屉侧栏 ============== */
 .hd-wrap { display: flex; align-items: center; gap: 10px; }
 .hamburger {
