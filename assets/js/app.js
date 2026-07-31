@@ -58,7 +58,7 @@ function resolveReadKey(key){
   var idx = key.lastIndexOf("#");
   var title = key.substring(0, idx);
   var n = parseInt(key.substring(idx+1), 10);
-  var books = (CFG.reading && CFG.reading.books) || [];
+  var books = ((CFG.reading && CFG.reading.books) || []).concat(getReadUserBooks());
   for(var i=0;i<books.length;i++){
     if(books[i].title===title){
       var chs = books[i].chapters||[];
@@ -410,10 +410,17 @@ function getReadUserBooks(){return lsJSON("wb_read_user_books",[]);}
 function setReadUserBooks(a){lsSetJSON("wb_read_user_books",a);}
 function getReadBookDone(){return lsJSON("wb_read_book_done",{});}
 function setReadBookDone(o){lsSetJSON("wb_read_book_done",o);}
+function makeChapters(n){var a=[];for(var i=1;i<=n;i++)a.push({n:i, title:'第 '+i+' 章'});return a;}
 
 function buildReading(d, type){
   var books = (CFG.reading.books||[]).slice();
   if(type) books = books.filter(function(b){return b.type===type;});
+  // 合并用户书架书目（无章节则按「全书」处理），形成按章阅读计划
+  var ub = getReadUserBooks().filter(function(b){return !b.type || b.type===type;});
+  ub.forEach(function(b){
+    var ch = (b.chapters && b.chapters.length) ? b.chapters : [{n:1, title:'全书'}];
+    books.push({title:b.title, author:b.author, type:b.type, _ub:true, chapters:ch});
+  });
   if(CFG.reading.firstBook) books.sort(function(a,b){return (a.title===CFG.reading.firstBook?-1:b.title===CFG.reading.firstBook?1:0);});
   var flat = [];
   books.forEach(function(b){ (b.chapters||[]).forEach(function(c){ flat.push({book:b, ch:c}); }); });
@@ -438,12 +445,12 @@ function renderReading(){
     '<div class="panel-sub">读了就勾选，没读就不勾选 · '+CFG.reminders.reading+' 提醒 <button type="button" class="btn-ghost" id="rdRemindBtn">开启桌面提醒</button></div>'+
     '<div class="tabs" id="rdSubTabs">'+subTabs+'</div>';
 
-  // 推荐页（书级「已读」勾选）
+  // 推荐页（书级「已读」勾选 + 加入按章计划）
   if(readSub==='reco'){
     var bdone = getReadBookDone();
     var groups = (CT.readReco||[]);
     var totalN=0, totalDone=0;
-    var html = head + '<div class="sub-block-hd">💡 推荐书单（勾选表示已读）</div>';
+    var html = head + '<div class="sub-block-hd">💡 推荐书单（勾选=已读；「加入计划」生成按章阅读计划）</div>';
     groups.forEach(function(g){
       var items = g.items||[];
       var gd = items.filter(function(it){return bdone[it.id];}).length;
@@ -452,7 +459,8 @@ function renderReading(){
         return '<div class="li reco-item'+(bdone[it.id]?' done':'')+'">'+
           '<input type="checkbox" class="rb-cb" data-rid="'+it.id+'"'+(bdone[it.id]?' checked':'')+'>'+
           '<div class="li-body"><div>《'+esc(it.title)+'》'+(it.author?' <span class="vtag bilibili" style="background:#a48cff">'+esc(it.author)+'</span>':'')+'</div>'+
-          '<div class="li-meta">'+(it.note?esc(it.note):'')+'</div></div></div>';
+          '<div class="li-meta">'+(it.note?esc(it.note):'')+'</div></div>'+
+          '<div class="li-actions"><button class="btn-edit" data-recoadd="'+it.id+'">📖 加入计划</button></div></div>';
       }).join("") : '<div class="empty-tip">暂无</div>';
       html += '<div class="reco-group"><div class="sub-block-hd">'+g.icon+' '+g.title+' <span class="reco-prog">'+gd+'/'+items.length+'</span></div><div class="reco-list">'+list+'</div></div>';
     });
@@ -471,23 +479,23 @@ function renderReading(){
       '<label class="rcheck"><input type="checkbox" data-read="'+it.gi+'" data-total="'+rd.total+'" '+(it.isDone?'checked':'')+'></label>'+
       '<div class="rc-body">'+
       '<div class="rc-t">《'+esc(it.book.title)+'》第 '+it.ch.n+' 章 · '+esc(it.ch.title)+'</div>'+
-      '<div class="rc-sum">'+esc(it.ch.summary||'')+'</div>'+
-      '<div class="rc-thought">❓ 思考：'+esc(it.ch.thought||'')+'</div>'+
+      (it.ch.summary?'<div class="rc-sum">'+esc(it.ch.summary)+'</div>':'')+
+      (it.ch.thought?'<div class="rc-thought">❓ 思考：'+esc(it.ch.thought)+'</div>':'')+
       '</div></div>';
   }
   var unreadHtml = rd.unread.length ? rd.unread.map(chapItem).join("") : '<div class="rest">本类章节都读完啦，享受回味 🌟</div>';
   var readHtml = rd.read.length ? '<div class="sub-block-hd" style="margin-top:14px;">✅ 已读章节（'+rd.read.length+' 章 · 可取消勾选）</div>'+rd.read.map(chapItem).join("") : '';
-  // 我的书架（用户添加，整本勾选）
+  // 我的书架（管理 + 阅读进度）
   var userBooks = getReadUserBooks().filter(function(b){return b.type===readSub;});
-  var bdone2 = getReadBookDone();
+  var doneSet = getReadDone();
   var shelfHtml = userBooks.length ? userBooks.map(function(b){
-    var dn = bdone2[b.id];
-    return '<div class="li reco-item'+(dn?' done':'')+'">'+
-      '<input type="checkbox" class="ub-cb" data-ubid="'+b.id+'"'+(dn?' checked':'')+'>'+
+    var chs = (b.chapters&&b.chapters.length)?b.chapters:[{n:1,title:'全书'}];
+    var dn = chs.filter(function(c){return doneSet.has(b.title+'#'+c.n);}).length;
+    return '<div class="li">'+
       '<div class="li-body"><div>《'+esc(b.title)+'》'+(b.author?' <span class="vtag bilibili" style="background:#a48cff">'+esc(b.author)+'</span>':'')+'</div>'+
-      '<div class="li-meta">我的书架</div></div>'+
+      '<div class="li-meta">阅读计划 · 已读 '+dn+'/'+chs.length+' 章</div></div>'+
       '<div class="li-actions"><button class="btn-del" data-ubdel="'+b.id+'">删</button></div></div>';
-  }).join("") : '<div class="empty-tip">书架还空，添加一本吧～</div>';
+  }).join("") : '<div class="empty-tip">书架还空～下方填书名+总章数即可生成按章阅读计划</div>';
   // 昨日阅读（全类型，与「昨日记录」整体一致）
   var yd2=yesterdayDate(d), ykey2=todayKey(yd2);
   var yReads=getReadLog().filter(function(e){return e.date===ykey2;});
@@ -504,12 +512,13 @@ function renderReading(){
     readHtml+
     '<div class="goal"><div class="bar"><div class="bar-fill" style="width:'+pct+'%"></div></div>'+
     '<div class="goal-sub">已完成 '+rd.done+' / '+rd.total+' 章 · '+pct+'%</div></div>'+
-    '<div class="sub-block-hd" style="margin-top:16px;">📝 我的书架（整本勾选）</div>'+
+    '<div class="sub-block-hd" style="margin-top:16px;">📝 我的书架（添加即生成按章计划）</div>'+
     '<div class="form-row">'+
       '<input type="hidden" id="ubType" value="'+readSub+'">'+
       '<input id="ubTitle" class="inp-text" placeholder="书名" maxlength="60">'+
       '<input id="ubAuthor" class="inp-text" placeholder="作者（可选）" maxlength="40">'+
-      '<button class="btn-primary" id="ubAdd">+ 加入书架</button>'+
+      '<input id="ubChapters" class="inp-amt" type="number" min="1" max="999" value="1" placeholder="总章数">'+
+      '<button class="btn-primary" id="ubAdd">+ 生成按章计划</button>'+
     '</div>'+
     '<div id="ubList">'+shelfHtml+'</div>'+
     yestHtmlRead;
@@ -540,23 +549,32 @@ function bindReading(){
       renderReading();
     };
   });
-  // 我的书架勾选
-  document.querySelectorAll('#m-reading .ub-cb').forEach(function(cb){
-    cb.onchange = function(){
-      var id=cb.getAttribute('data-ubid');
-      var o=getReadBookDone();
-      if(cb.checked) o[id]=1; else delete o[id];
-      setReadBookDone(o);
+  // 推荐「加入计划」：生成按章阅读计划
+  document.querySelectorAll('#m-reading .btn-edit[data-recoadd]').forEach(function(b){
+    b.onclick=function(){
+      var rid=b.getAttribute('data-recoadd');
+      var item=null; (CT.readReco||[]).forEach(function(g){(g.items||[]).forEach(function(it){if(it.id===rid)item=it;});});
+      if(!item) return;
+      var n=parseInt(window.prompt('《'+item.title+'》共有多少章？', '20'),10);
+      if(isNaN(n)||n<1) n=1;
+      var arr=getReadUserBooks();
+      if(arr.some(function(x){return x.title===item.title;})){ alert('书架上已有《'+item.title+'》'); return; }
+      arr.unshift({id:uid(), title:item.title, author:item.author||'', type:item.type||'web', chapters:makeChapters(n)});
+      setReadUserBooks(arr);
+      readSub = item.type||'web';
       renderReading();
     };
   });
-  // 加入书架
+  // 加入书架（生成按章计划）
   var ua=document.getElementById("ubAdd");
   if(ua) ua.onclick=function(){
     var t=document.getElementById("ubTitle").value.trim();
     if(!t){alert("请输入书名");return;}
+    var n=parseInt(document.getElementById("ubChapters").value,10);
+    if(isNaN(n)||n<1) n=1;
     var arr=getReadUserBooks();
-    arr.unshift({id:uid(), title:t, author:document.getElementById("ubAuthor").value.trim(), type:document.getElementById("ubType").value});
+    if(arr.some(function(x){return x.title===t;})){alert("书架上已有《"+t+"》");return;}
+    arr.unshift({id:uid(), title:t, author:document.getElementById("ubAuthor").value.trim(), type:document.getElementById("ubType").value, chapters:makeChapters(n)});
     setReadUserBooks(arr);renderReading();
   };
   // 删除书架
